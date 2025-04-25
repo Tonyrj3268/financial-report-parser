@@ -28,9 +28,9 @@ class ForeignDeposits(BaseModel):
 class TWDDeposit(BaseModel):
     """新台幣存款"""
 
-    demand: List[float] = Field(..., alias="活期性存款(新台幣)")
-    term: List[float] = Field(..., alias="定期性存款(新台幣)")
-    checking: List[float] = Field(..., alias="支票存款(新台幣)")
+    demand: float = Field(..., alias="活期性存款(新台幣)")
+    term: float = Field(..., alias="定期性存款(新台幣)")
+    checking: float = Field(..., alias="支票存款(新台幣)")
 
 
 class BasicCash(BaseModel):
@@ -63,6 +63,8 @@ class CashAndEquivalents(BaseModel):
     allowance_doubtful: float = Field(..., alias="備抵呆帳—存放銀行同業")
     subtotal: Optional[float] = Field(None, alias="小計")
     total: Optional[float] = Field(None, alias="合計")
+    # 單位是否為１０００
+    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
 
 
 cash_equivalents_prompt = """
@@ -79,12 +81,12 @@ cash_equivalents_prompt = """
      - 運送中現金  
 
    - **新台幣存款**：  
-     - 活期性存款(新台幣)：每項包含 { 幣別, 金額(外幣), 匯率, Optional(金額(新台幣)) }  
+     - 活期性存款(新台幣)：每項包含 { 金額(新台幣) }  
      - 定期性存款(新台幣)：同上結構  
-     - 支票存款(新台幣)：同上結構  
+     - 支票存款(新台幣)：同上結構
 
    - **外幣存款** ：  
-     - 外幣活期存款：列表，每項包含 { 幣別, 金額(外幣), 匯率, Optional(金額(新台幣)) }  
+     - 外幣活期存款：列表，每項包含 { 幣別, 金額(外幣), 匯率, Optional(金額(新台幣)) }，「其他」也屬於一種外幣類別  
      - 外幣定期存款：同上結構  
      - 外幣支票存款：同上結構  
 
@@ -92,11 +94,15 @@ cash_equivalents_prompt = """
      - 商業本票  
      - 附買回交易  
 
-   - **備抵呆帳—存放銀行同業**  
+   - **備抵呆帳—存放銀行同業** : 如果該數值用()表示，則請返回負數。
    - **小計**  
    - **合計**  
 
+   - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
 注意事項
-最終輸出中的【所有】貨幣數值都以【元】為單位。如果資料來源使用「仟元」或其他單位，必須換算為「元」（例如，「仟元」需乘以 1000）。
+最終輸出中的【所有】貨幣數值都以資料來源為主。
 欄位齊全：即使某些子欄位為 0 或空，也要列出並填入 0 或 null。
+沒有特別說明幣種的話，默認為新台幣，例如當出現支票存款時且沒有幣別時，則默認為支票存款(新台幣)。
+倘若有組合的項目，例如「支票存款及活期存款」，則請將其填入其中之一的項目(支票存款或活期存款），並在另一個欄位填入0。
+如果該數值用()表示，則請返回負數。
 """
