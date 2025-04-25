@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class ForeignDeposit(BaseModel):
+    """外幣存款"""
+
+    # 幣別
+    currency: str = Field(..., alias="幣別")
+    # 金額(外幣)
+    foreign_amount: float = Field(..., alias="金額(外幣)")
+    # 匯率
+    exchange_rate: float = Field(..., alias="匯率")
+    # 金額(新台幣)
+    twd_amount: Optional[float] = Field(None, alias="金額(新台幣)")
+
+
+class ForeignDeposits(BaseModel):
+
+    demand: List[ForeignDeposit] = Field(..., alias="外幣活期存款")
+    term: List[ForeignDeposit] = Field(..., alias="外幣定期存款")
+    checking: List[ForeignDeposit] = Field(..., alias="外幣支票存款")
+
+
+class TWDDeposit(BaseModel):
+    """新台幣存款"""
+
+    demand: List[float] = Field(..., alias="活期性存款(新台幣)")
+    term: List[float] = Field(..., alias="定期性存款(新台幣)")
+    checking: List[float] = Field(..., alias="支票存款(新台幣)")
+
+
+class BasicCash(BaseModel):
+    """現金項目"""
+
+    on_hand: float = Field(..., alias="庫存現金")
+    petty_cash: float = Field(..., alias="零用金")
+    # 週轉金
+    revolving_fund: float = Field(..., alias="週轉金")
+    notes_for_exchange: float = Field(..., alias="待交換票據")
+    in_transit: float = Field(..., alias="運送中現金")
+
+
+class MarketableInstrument(BaseModel):
+    """約當現金–商業本票／附買回交易"""
+
+    # 商業本票
+    commercial_paper: float = Field(..., alias="商業本票")
+    # 附買回交易
+    repurchase_agreement: float = Field(..., alias="附買回交易")
+
+
+class CashAndEquivalents(BaseModel):
+    """現金及約當現金明細總表"""
+
+    cash: BasicCash = Field(..., alias="現金")
+    twd_deposit: TWDDeposit = Field(..., alias="新台幣存款")
+    foreign_deposits: ForeignDeposits = Field(..., alias="外幣存款")
+    marketable_instruments: MarketableInstrument = Field(..., alias="約當現金")
+    allowance_doubtful: float = Field(..., alias="備抵呆帳—存放銀行同業")
+    subtotal: Optional[float] = Field(None, alias="小計")
+    total: Optional[float] = Field(None, alias="合計")
+
+
+cash_equivalents_prompt = """
+請你嚴格遵守以下指令，從提供的 PDF 中定位到「現金及約當現金明細表」，並回傳對應的純 JSON，欄位名稱請使用以下 alias（中文）：
+
+指令：抽取並回填「現金及約當現金明細表」
+
+1. 模型欄位結構  
+   - **現金**：  
+     - 庫存現金  
+     - 零用金  
+     - 週轉金  
+     - 待交換票據  
+     - 運送中現金  
+
+   - **新台幣存款**：  
+     - 活期性存款(新台幣)：每項包含 { 幣別, 金額(外幣), 匯率, Optional(金額(新台幣)) }  
+     - 定期性存款(新台幣)：同上結構  
+     - 支票存款(新台幣)：同上結構  
+
+   - **外幣存款** ：  
+     - 外幣活期存款：列表，每項包含 { 幣別, 金額(外幣), 匯率, Optional(金額(新台幣)) }  
+     - 外幣定期存款：同上結構  
+     - 外幣支票存款：同上結構  
+
+   - **約當現金**：  
+     - 商業本票  
+     - 附買回交易  
+
+   - **備抵呆帳—存放銀行同業**  
+   - **小計**  
+   - **合計**  
+
+注意事項
+最終輸出中的【所有】貨幣數值都以【元】為單位。如果資料來源使用「仟元」或其他單位，必須換算為「元」（例如，「仟元」需乘以 1000）。
+欄位齊全：即使某些子欄位為 0 或空，也要列出並填入 0 或 null。
+"""
