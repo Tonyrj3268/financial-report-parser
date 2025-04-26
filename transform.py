@@ -5,6 +5,7 @@ from openai import OpenAI
 
 from models.cash_equivalents import CashEquivalents, cash_equivalents_prompt
 from models.exp_model import CashAndEquivalents, cash_equivalents_prompt
+from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
 import os
 import logging
 from pprint import pformat
@@ -61,11 +62,10 @@ def chat_with_file(file_id, text, response_format):
 
 if __name__ == "__main__":
 
-    # file_id = upload_file("TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf")
-    # file_id = "file-X269JoL59QfurudTY48adv"  # 中信金
-    file_id = "file-LQokuRBxkg2CEp3PZiFBMf"  # 台積電
+    # file_id = upload_file("20240314171909745560928_tc.pdf")
+    file_id = "file-X269JoL59QfurudTY48adv"  # 中信金
+    # file_id = "file-LQokuRBxkg2CEp3PZiFBMf"  # 台積電
     print("File uploaded, id:", file_id)
-    reply: CashAndEquivalents = chat_with_file(
-        file_id, cash_equivalents_prompt, CashAndEquivalents
-    )
+    # reply = chat_with_file(file_id, cash_equivalents_prompt, CashAndEquivalents)
+    reply = chat_with_file(file_id, total_liabilities_prompt, TotalLiabilities)
     print("Origin: ", reply)
