@@ -1,4 +1,6 @@
+import logging
 import os
+from pprint import pformat
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -6,9 +8,6 @@ from openai import OpenAI
 from models.cash_equivalents import CashEquivalents, cash_equivalents_prompt
 from models.exp_model import CashAndEquivalents, cash_equivalents_prompt
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
-import os
-import logging
-from pprint import pformat
 
 # 設定 logging
 logging.basicConfig(
@@ -54,6 +53,44 @@ def chat_with_file(file_id, text, response_format):
     )
     parsed = response.choices[0].message.parsed
     logger.info(
+        "花費Token數量: %s",
+        response.usage.total_tokens,
+    )
+    logger.info(
+        "解析結果:\n%s",
+        pformat(parsed.model_dump(), indent=2, width=80, sort_dicts=False),
+    )
+    return parsed
+
+
+def chat_with_markdown(markdown, text, response_format):
+    logger.info("與Markdown互動，Markdown=%s, prompt:\n%s", markdown, text)
+    response = client.beta.chat.completions.parse(
+        model="gpt-4.1",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": markdown,
+                    },
+                    {
+                        "type": "text",
+                        "text": text,
+                    },
+                ],
+            }
+        ],
+        response_format=response_format,
+        temperature=0,
+    )
+    parsed = response.choices[0].message.parsed
+    logger.info(
+        "花費Token數量: %s",
+        response.usage.total_tokens,
+    )
+    logger.info(
         "解析結果:\n%s",
         pformat(parsed.model_dump(), indent=2, width=80, sort_dicts=False),
     )
@@ -62,11 +99,20 @@ def chat_with_file(file_id, text, response_format):
 
 if __name__ == "__main__":
 
-    # file_id = upload_file("113Q4 華碩財報(個體).pdf")
+    file_id = upload_file("quartely-results-2024-zh_tcm27-94407.pdf")
     # file_id = "file-X269JoL59QfurudTY48adv"  # 中信金
-    file_id = "file-LQokuRBxkg2CEp3PZiFBMf"  # 台積電
+    # file_id = "file-LQokuRBxkg2CEp3PZiFBMf"  # 台積電
     # file_id = "file-FsNfKa6Ydbi2hRHKfW9TTw"  # 華碩
+    # file_id = "file-4YPtrJes7jpnUSRf7BVAx1"  # 統一
+    # file_id = "file-KGXtvwDDkZ8wYCMRiAeRQg"  # 長榮航空
     print("File uploaded, id:", file_id)
     reply = chat_with_file(file_id, cash_equivalents_prompt, CashAndEquivalents)
-    # reply = chat_with_file(file_id, total_liabilities_prompt, TotalLiabilities)
+    # with open(
+    #     "quartely-results-2024-zh_tcm27-94407.pdf.md", "r", encoding="utf-8"
+    # ) as f:
+    #     markdown = f.read()
+    # reply = chat_with_markdown(markdown, cash_equivalents_prompt, CashAndEquivalents)
     print("Origin: ", reply)
+
+    # reply = chat_with_file(file_id, total_liabilities_prompt, TotalLiabilities)
+    # print("Origin: ", reply)
