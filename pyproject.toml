@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "dotenv>=0.9.9",
+    "llama-cloud-services>=0.6.21",
     "openai>=1.76.0",
     "pikepdf>=9.7.0",
     "pymupdf>=1.25.5",
