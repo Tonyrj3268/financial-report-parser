@@ -1,94 +1,119 @@
-from typing import List
+from __future__ import annotations
 
-from pydantic import BaseModel, Field, StrictFloat
+from typing import List, Optional
 
-
-class ForiginDeposit(BaseModel):
-    currency: str = Field(
-        ...,
-        alias="幣別",
-        description="The currency type of the deposit.",
-    )
-    amount_list: List[float] = Field(
-        ...,
-        alias="金額清單",
-        description="List of amounts in the original currency.",
-    )
-    exchange_rate: float = Field(
-        ...,
-        alias="匯率",
-        description="The exchange rate to New Taiwan dollars.",
-    )
-
-    @property
-    def amount_in_twd(self) -> List[float]:
-        """
-        Convert the amounts in the original currency to New Taiwan dollars using the exchange rate.
-        """
-        return sum(self.amount_list) * self.exchange_rate
+from pydantic import BaseModel, Field
 
 
-class CashEquivalents(BaseModel):
-    cash_and_petty: StrictFloat = Field(
-        ...,
-        alias="庫存現金及零用金",
-        description="The amount of cash and petty cash after calculations in yuan.",
-    )
-    current_deposits_twd: StrictFloat = Field(
-        ...,
-        alias="活期性存款(新台幣)",
-        description="The amount of current deposits in New Taiwan dollars after calculations.",
-    )
-    time_deposits_twd: StrictFloat = Field(
-        ...,
-        alias="定期性存款(新台幣)",
-        description="The amount of time deposits in New Taiwan dollars after calculations.",
-    )
-    foreign_deposits: List[ForiginDeposit] = Field(
-        ...,
-        alias="外匯活期及定期存款",
-        description=(
-            "List of foreign currency deposits. Each item is a dict with keys: '幣別' (str), '金額清單' (List[float]), '匯率' (float)."
-        ),
-    )
+class ForeignDeposit(BaseModel):
+    """外幣存款"""
 
-    def to_rows(self) -> List[List]:
-        """
-        Convert the CashEquivalents object to a list of rows for easier display.
-        """
-        rows: List[List] = []
-        rows.append(["一、庫存現金及零用金", self.cash_and_petty])
-        rows.append(["二、國內金融機構存款"])
-        rows.append(["1.活期性存款(新台幣)", self.current_deposits_twd])
-        rows.append(["2.定期性存款(新台幣)", self.time_deposits_twd])
-        all_fx = [fd.amount_in_twd for fd in self.foreign_deposits]
-        rows.append(["3.外匯活期和及定期存款", *all_fx[:3], sum(all_fx[3:])])
+    # 幣別
+    currency: str = Field(..., alias="幣別")
+    # 金額(外幣)
+    foreign_amount: float = Field(..., alias="金額(外幣)")
+    # 匯率
+    exchange_rate: float = Field(..., alias="匯率")
+    # 金額(新台幣)
+    twd_amount: Optional[float] = Field(None, alias="金額(新台幣)")
+    # 單位是否為１０００
+    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
 
-        return rows
+
+class ForeignDeposits(BaseModel):
+
+    demand: List[ForeignDeposit] = Field(..., alias="外幣活期存款")
+    term: List[ForeignDeposit] = Field(..., alias="外幣定期存款")
+    checking: List[ForeignDeposit] = Field(..., alias="外幣支票存款")
+    # 單位是否為１０００
+    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
+
+
+class TWDDeposit(BaseModel):
+    """新台幣存款"""
+
+    demand: float = Field(..., alias="活期性存款(新台幣)")
+    term: float = Field(..., alias="定期性存款(新台幣)")
+    checking: float = Field(..., alias="支票存款(新台幣)")
+    # 單位是否為１０００
+    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
+
+
+class BasicCash(BaseModel):
+    """現金項目"""
+
+    on_hand: float = Field(..., alias="庫存現金")
+    petty_cash: float = Field(..., alias="零用金")
+    # 週轉金
+    revolving_fund: float = Field(..., alias="週轉金")
+    notes_for_exchange: float = Field(..., alias="待交換票據")
+    in_transit: float = Field(..., alias="運送中現金")
+    # 單位是否為１０００
+    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
+
+
+class MarketableInstrument(BaseModel):
+    """約當現金–商業本票／附買回交易"""
+
+    # 商業本票
+    commercial_paper: float = Field(..., alias="商業本票")
+    # 附買回交易
+    repurchase_agreement: float = Field(..., alias="附買回交易")
+    # 單位是否為１０００
+    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
+
+
+class CashAndEquivalents(BaseModel):
+    """現金及約當現金明細總表"""
+
+    cash: BasicCash = Field(..., alias="現金")
+    twd_deposit: TWDDeposit = Field(..., alias="新台幣存款")
+    foreign_deposits: ForeignDeposits = Field(..., alias="外幣存款")
+    marketable_instruments: MarketableInstrument = Field(..., alias="約當現金")
+    allowance_doubtful: float = Field(..., alias="備抵呆帳—存放銀行同業")
+    subtotal: Optional[float] = Field(None, alias="小計")
+    total: Optional[float] = Field(None, alias="合計")
+    # 單位是否為１０００
+    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
 
 
 cash_equivalents_prompt = """
-    # 指令：處理 PDF 財務報表資料
+請你嚴格遵守以下指令，從提供的 PDF 中定位到「現金及約當現金明細表」，並回傳對應的純 JSON，欄位名稱請使用以下 alias（中文）：
 
-    ## 1. 主要目標
-    請分析提供的 PDF 檔案內容，定位到「現金及約當現金明細表」（或具有類似名稱、包含相關現金與銀行存款明細的表格/段落）。
+指令：抽取並回填「現金及約當現金明細表」
 
-    ## 2. 資料提取與計算要求
-    從定位到的表格/段落中，提取以下資訊，並執行必要的計算：
+1. 模型欄位結構  
+   - **現金**：  
+     - 庫存現金  
+     - 零用金  
+     - 週轉金  
+     - 待交換票據  
+     - 運送中現金  
+     - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
+   - **新台幣存款**：  
+     - 活期性存款(新台幣)：每項包含 { 金額(新台幣) }  
+     - 定期性存款(新台幣)：同上結構  
+     - 支票存款(新台幣)：同上結構
+     - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
+   - **外幣存款** ：  
+     - 外幣活期存款：列表，每項包含 { 幣別, 金額(外幣), 匯率, Optional(金額(新台幣)) }，「其他」也屬於一種外幣類別  
+     - 外幣定期存款：同上結構  
+     - 外幣支票存款：同上結構  
+     - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
+   - **約當現金**：  
+     - 商業本票  
+     - 附買回交易  
+     - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
+   - **備抵呆帳—存放銀行同業** : 如果該數值用()表示，則請返回負數。
+   - **小計**  
+   - **合計**  
 
-    * **庫存現金及零用金**: 找到對應的數值。
-    * **活期性存款(新台幣)**: 找到標示為此項目的數值。
-    * **定期性存款(新台幣)**: 找到標示為此項目的數值。
-    * **外匯活期和及定期存款**：
-        * 識別所有列出的外幣幣別及其【原幣金額】（需注意來源可能是活期、定期或其他類型）。
-        * 找出該外幣幣別的匯率（通常標示為 '@' 或在附近說明），不需要幫我換算。
-        * **請列出同一幣別下所有類型存款的各筆【計算後金額】清單，讓我自己加總。**
-
-    ## 3. 輸出格式與規範 (極重要)
-
-    * **計算與單位**：
-        * **確保**最終輸出中的【所有】貨幣數值都以【元】為單位。如果資料來源使用「仟元」或其他單位，必須換算為「元」（例如，「仟元」需乘以 1000）。
-
-    ## 4. 執行
-    請嚴格按照以上所有要求進行處理。
-    """
+   - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
+注意事項
+最終輸出中的【所有】貨幣數值都以資料來源為主。
+欄位齊全：即使某些子欄位為 0 或空，也要列出並填入 0 或 null。
+沒有特別說明幣種的話，默認為新台幣，例如當出現支票存款時且沒有幣別時，則默認為支票存款(新台幣)。
+倘若有組合的項目，例如「支票存款及活期存款」，則請將其填入活期存款，並在支票存款填入0。
+如果該數值用()表示，則請返回負數。
+同一個表和註解中並非所有的數值單位都是一樣的，如果整張表默認單位為千元，但是有些項目卻在數值後面加上元，則請記得在該項目的unit_is_thousand回傳False。例如:"USD 47,534,325.95元" 這種情況請在該臂腫的unit_is_thousand回傳False。
+"""

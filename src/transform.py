@@ -5,8 +5,7 @@ from pprint import pformat
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from models.cash_equivalents import CashEquivalents, cash_equivalents_prompt
-from models.exp_model import CashAndEquivalents, cash_equivalents_prompt
+from models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
 
 # 設定 logging

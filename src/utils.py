@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pikepdf
 
-
 # 常見的標準編碼，缺少 ToUnicode 但仍能被閱讀器正確映射
 STD_ENCODINGS = {
     "/WinAnsiEncoding",
@@ -38,24 +37,26 @@ def has_to_unicode(fontobj: pikepdf.Object) -> bool:
     return False
 
 
-def fonts_missing_tounicode(pdf_path: str | Path) -> list[tuple[int, str]]:
+def fonts_missing_tounicode(pdf_path: str | Path) -> bool:
     """
-    傳回 [(page_no, font_tag), …]，表示哪些頁的哪些字型
-    最終都沒找到 ToUnicode 也沒有標準編碼可 fallback。
-    空陣列 = 理論上可正常複製貼上。
+    傳回 True or False，表示 PDF 中是否有字型缺少 ToUnicode。
+    這個函式會檢查 PDF 中的每一頁，並檢查每一頁的字型資源。
     """
-    misses: list[tuple[int, str]] = []
     with pikepdf.open(pdf_path) as pdf:
-        for page_no, page in enumerate(pdf.pages, start=1):
+        for _, page in enumerate(pdf.pages, start=1):
             fonts = page.Resources.get("/Font", {})
-            for tag, font_ref in fonts.items():
+            for _, font_ref in fonts.items():
                 font = font_ref
                 if not has_to_unicode(font):
-                    misses.append((page_no, str(tag)))
-    return misses
+                    return True
+    return False
 
 
 if __name__ == "__main__":
+    from pathlib import Path
+
+    PDF_DIR = Path(__file__).parent.parent / "assests/pdfs"
+
     for pdf in [
         "quartely-results-2024-zh_tcm27-94407.pdf",
         "fin_202503071324328842.pdf",
@@ -63,10 +64,8 @@ if __name__ == "__main__":
         "113Q4 華碩財報(個體).pdf",
         "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf",
     ]:
-        bad_fonts = fonts_missing_tounicode(pdf)
+        bad_fonts = fonts_missing_tounicode(PDF_DIR / pdf)
         if bad_fonts:
-
-            print(f"偵測到{pdf}缺 ToUnicode 的字型：")
-            print(bad_fonts)
+            print(f"偵測到 {pdf} 缺 ToUnicode 的字型")
         else:
-            print(f"{pdf}所有字型皆含 ToUnicode，理論上可正常複製貼上。")
+            print(f"{pdf} 所有字型皆含 ToUnicode，理論上可正常複製貼上。")
