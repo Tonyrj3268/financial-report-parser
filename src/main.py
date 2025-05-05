@@ -3,6 +3,7 @@ from transform import upload_file, chat_with_file, chat_with_markdown
 from parse import parse_pdf
 from models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
+from models.prepayments import PrePayments, prepayments_prompt
 from models.base import FinancialReport, financial_report_prompt
 from pathlib import Path
 
@@ -12,10 +13,10 @@ MD_DIR = Path(__file__).parent.parent / "assests/markdowns"
 
 pdf_mapping = {
     "quartely-results-2024-zh_tcm27-94407.pdf": "file-KGXtvwDDkZ8wYCMRiAeRQg",  # 長榮航空
-    "113Q4 華碩財報(個體).pdf": "file-FsNfKa6Ydbi2hRHKfW9TTw",  # 華碩
-    "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf": "file-LQokuRBxkg2CEp3PZiFBMf",  # 台積電
+    # "113Q4 華碩財報(個體).pdf": "file-FsNfKa6Ydbi2hRHKfW9TTw",  # 華碩
+    # "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf": "file-LQokuRBxkg2CEp3PZiFBMf",  # 台積電
     # "20240314171909745560928_tc.pdf": "file-X269JoL59QfurudTY48adv",  # 中信金
-    "fin_202503071324328842.pdf": "file-4YPtrJes7jpnUSRf7BVAx1",  # 統一
+    # "fin_202503071324328842.pdf": "file-4YPtrJes7jpnUSRf7BVAx1",  # 統一
 }
 
 model_prompt_mapping = {
@@ -26,6 +27,10 @@ model_prompt_mapping = {
     "total_liabilities": {
         "prompt": total_liabilities_prompt,
         "model": TotalLiabilities,
+    },
+    "prepayments": {
+        "prompt": prepayments_prompt,
+        "model": PrePayments,
     },
     "financial_report": {
         "prompt": financial_report_prompt,
@@ -62,8 +67,8 @@ if __name__ == "__main__":
     results = {}
     for filename, file_id in pdf_mapping.items():
         pdf_path = PDF_DIR / filename
-        prompt = model_prompt_mapping["financial_report"]["prompt"]
-        model = model_prompt_mapping["financial_report"]["model"]
+        prompt = model_prompt_mapping["prepayments"]["prompt"]
+        model = model_prompt_mapping["prepayments"]["model"]
         res = process(pdf_path, prompt, model)
         results[filename] = res.model_dump()
     import json
