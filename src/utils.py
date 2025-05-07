@@ -55,7 +55,7 @@ def fonts_missing_tounicode(pdf_path: str | Path) -> bool:
 if __name__ == "__main__":
     from pathlib import Path
 
-    PDF_DIR = Path(__file__).parent.parent / "assests/pdfs"
+    PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
 
     for pdf in [
         "quartely-results-2024-zh_tcm27-94407.pdf",

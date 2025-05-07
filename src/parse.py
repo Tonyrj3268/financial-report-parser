@@ -59,8 +59,8 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     from pathlib import Path
 
-    PDF_DIR = Path(__file__).parent.parent / "assests/pdfs"
-    MD_DIR = Path(__file__).parent.parent / "assests/markdowns"
+    PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
+    MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
     # Load environment variables from .env file
     load_dotenv()
     pdf_path = PDF_DIR / "quartely-results-2024-zh_tcm27-94407.pdf"

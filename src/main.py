@@ -7,8 +7,8 @@ from models.prepayments import PrePayments, prepayments_prompt
 from models.base import FinancialReport, financial_report_prompt
 from pathlib import Path
 
-PDF_DIR = Path(__file__).parent.parent / "assests/pdfs"
-MD_DIR = Path(__file__).parent.parent / "assests/markdowns"
+PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
+MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
 
 
 pdf_mapping = {
