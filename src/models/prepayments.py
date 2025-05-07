@@ -1,20 +1,17 @@
 from pydantic import BaseModel, Field
+from .base import LabeledValue
 
 
 class PrePayments(BaseModel):
-    prepayments_for_good: float = Field(
+    prepayments_for_good: LabeledValue = Field(
         ...,
         alias="預付款項",
     )
-    prepayments_for_equipment: float = Field(
+    prepayments_for_equipment: LabeledValue = Field(
         ...,
         alias="預付設備款",
     )
     unit_is_thousand: bool = Field(None, alias="單位是否為千元")
-    source_page: list[int] = Field(
-        ...,
-        alias="來源頁碼",
-    )
 
 
 prepayments_prompt = """
@@ -26,8 +23,6 @@ prepayments_prompt = """
    - **預付設備款**：數值為 { 金額 }，主要為預付給供應商的設備款
 
    - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
-
-   - **來源頁碼**：列表，包含所有來源頁碼，主要用於確認資料的正確性和完整性
 
 注意事項
 最終輸出中的【所有】貨幣數值都以資料來源為主。

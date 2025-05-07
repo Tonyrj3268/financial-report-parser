@@ -4,7 +4,7 @@ from parse import parse_pdf
 from models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
 from models.prepayments import PrePayments, prepayments_prompt
-from models.base import FinancialReport, financial_report_prompt
+from models.total import FinancialReport, financial_report_prompt
 from pathlib import Path
 
 PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"

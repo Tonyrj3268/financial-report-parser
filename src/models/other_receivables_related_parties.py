@@ -1,8 +1,9 @@
 from pydantic import BaseModel, Field
+from .base import LabeledValue
 
 
 class OtherReceivablesRelatedParties(BaseModel):
-    other_receivables_related_parties: float = Field(
+    other_receivables_related_parties: LabeledValue = Field(
         ...,
         alias="其他應收款項-關係人",
     )
@@ -10,13 +11,8 @@ class OtherReceivablesRelatedParties(BaseModel):
         None,
         alias="單位是否為千元",
     )
-    source_page: list[int] = Field(
-        ...,
-        alias="來源頁碼",
-    )
 
 
-# prompt
 other_receivables_related_parties_prompt = """
 請你嚴格遵守以下指令，從提供的 PDF 中定位到「資產負債表」和其提到的相關附註或附錄，並回傳對應的純 JSON，欄位名稱請使用以下 alias（中文）：
 
@@ -24,9 +20,7 @@ other_receivables_related_parties_prompt = """
    - **其他應收款項-關係人**： 數值為 { 金額 }，主要為應收關係人的款項
 
    - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
-
-   - **來源頁碼**：列表，包含所有來源頁碼，主要用於確認資料的正確性和完整性
-
+   
 注意事項
 最終輸出中的【所有】貨幣數值都以資料來源為主。
 欄位齊全：即使某些子欄位為 0 或空，也要列出並填入 0 或 null。
