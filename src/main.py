@@ -48,6 +48,10 @@ model_prompt_mapping = {
         "prompt": financial_report_prompt,
         "model": FinancialReport,
     },
+    "table_locations": {
+        "prompt": table_locations_prompt,
+        "model": FinancialReportPages,
+    },
 }
 
 
