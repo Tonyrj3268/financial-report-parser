@@ -13,6 +13,13 @@ class OtherReceivablesRelatedParties(BaseModel):
     )
 
 
+# 1. 應收帳款 (或應收款項)
+# 2. 應收票據
+# 3. 其他應收款 (或其他應收帳款)
+
+# 4. 應收帳款-關係人 (應收關係人帳款)
+# 5. 其他應收款-關係人 (其他關係人應收款)
+
 other_receivables_related_parties_prompt = """
 請你嚴格遵守以下指令，從提供的 PDF 中定位到「資產負債表」和其提到的相關附註或附錄，並回傳對應的純 JSON，欄位名稱請使用以下 alias（中文）：
 
