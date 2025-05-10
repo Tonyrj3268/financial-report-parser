@@ -10,6 +10,8 @@ from models.receivables_related_parties import (
     receivables_related_parties_prompt,
 )
 from pathlib import Path
+import concurrent.futures
+import json
 
 PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
 MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
@@ -71,15 +73,34 @@ def process(pdf_path, prompt, model, target_pages=None):
     return reply
 
 
+def process_wrapper(filename, modelname):
+    try:
+        prompt = model_prompt_mapping[modelname]["prompt"]
+        model = model_prompt_mapping[modelname]["model"]
+        res = process(PDF_DIR / filename, prompt, model)
+        return filename, res.model_dump(), None
+    except Exception as e:
+        return filename, None, str(e)
+
+
 if __name__ == "__main__":
-    results = {}
-    for filename, file_id in pdf_mapping.items():
-        pdf_path = PDF_DIR / filename
-        prompt = model_prompt_mapping["financial_report"]["prompt"]
-        model = model_prompt_mapping["financial_report"]["model"]
-        res = process(pdf_path, prompt, model)
-        results[filename] = res.model_dump()
-    import json
+    results, failed = {}, {}
+    modelname = "financial_report"
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(process_wrapper, filename, modelname)
+            for filename in pdf_mapping.keys()
+        ]
+        for fut in concurrent.futures.as_completed(futures):
+            fn, result, err = fut.result()
+            if err:
+                failed[fn] = err
+            else:
+                results[fn] = result
 
     with open("results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
+    # 若有失敗，也可另存
+    if failed:
+        with open("failed.json", "w", encoding="utf-8") as f:
+            json.dump(failed, f, ensure_ascii=False, indent=4)

@@ -1,0 +1,793 @@
+{
+    "quartely-results-2024-zh_tcm27-94407.pdf": {
+        "cash_equivalents": {
+            "cash": {
+                "on_hand": {
+                    "value": 7.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "petty_cash": {
+                    "value": 0.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "revolving_fund": {
+                    "value": 96209.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "notes_for_exchange": {
+                    "value": 0.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "in_transit": {
+                    "value": 0.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "twd_deposit": {
+                "demand": {
+                    "value": 512464.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "term": {
+                    "value": 27381796.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "checking": {
+                    "value": 127286.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "foreign_deposits": {
+                "demand": [
+                    {
+                        "currency": "其他",
+                        "foreign_amount": {
+                            "value": 0.0,
+                            "source_page": 70,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 0.0,
+                            "source_page": 70,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": {
+                            "value": 2239818.0,
+                            "source_page": 70,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "unit_is_thousand": true
+                    }
+                ],
+                "term": [
+                    {
+                        "currency": "USD",
+                        "foreign_amount": {
+                            "value": 1145830.0,
+                            "source_page": 70,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 32.785,
+                            "source_page": 70,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": {
+                            "value": 37566027.0,
+                            "source_page": 70,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "unit_is_thousand": true
+                    }
+                ],
+                "checking": [],
+                "unit_is_thousand": true
+            },
+            "marketable_instruments": {
+                "commercial_paper": {
+                    "value": 0.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "repurchase_agreement": {
+                    "value": 0.0,
+                    "source_page": 70,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "allowance_doubtful": {
+                "value": 0.0,
+                "source_page": 70,
+                "source_label": "現金及約當現金明細表"
+            },
+            "subtotal": {
+                "value": 64947823.0,
+                "source_page": 70,
+                "source_label": "現金及約當現金明細表"
+            },
+            "total": {
+                "value": 67923607.0,
+                "source_page": 70,
+                "source_label": "現金及約當現金明細表"
+            },
+            "unit_is_thousand": true
+        },
+        "total_liabilities": {
+            "domestic_bank_short_term_loans": {
+                "value": 7766875.0,
+                "source_page": 32,
+                "source_label": "長期借款明細表"
+            },
+            "domestic_bank_long_term_loans": {
+                "value": 35179308.0,
+                "source_page": 32,
+                "source_label": "長期借款明細表"
+            },
+            "unit_is_thousand": true
+        },
+        "receivables_related_parties": {
+            "accounts_receivable": {
+                "value": 8365586.0,
+                "source_page": 71,
+                "source_label": "應收帳款明細表"
+            },
+            "notes_receivable": {
+                "value": 1073077.0,
+                "source_page": 71,
+                "source_label": "應收票據明細表"
+            },
+            "other_receivables": {
+                "value": 393752.0,
+                "source_page": 26,
+                "source_label": "其他應收款"
+            },
+            "accounts_receivable_related_parties": {
+                "value": 203448.0,
+                "source_page": 4,
+                "source_label": "資產負債表"
+            },
+            "other_receivables_related_parties": {
+                "value": 149765.0,
+                "source_page": 58,
+                "source_label": "應收關係人款項"
+            },
+            "unit_is_thousand": true
+        },
+        "prepayments": {
+            "prepayments_for_good": {
+                "value": 387413.0,
+                "source_page": 31,
+                "source_label": "其他流動資產"
+            },
+            "prepayments_for_equipment": {
+                "value": 18923640.0,
+                "source_page": 31,
+                "source_label": "其他非流動資產"
+            },
+            "unit_is_thousand": true
+        }
+    },
+    "fin_202503071324328842.pdf": {
+        "cash_equivalents": {
+            "cash": {
+                "on_hand": {
+                    "value": 1982.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "petty_cash": {
+                    "value": 0.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "revolving_fund": {
+                    "value": 0.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "notes_for_exchange": {
+                    "value": 0.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "in_transit": {
+                    "value": 0.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "twd_deposit": {
+                "demand": {
+                    "value": 54052.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "term": {
+                    "value": 0.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "checking": {
+                    "value": 17033.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "foreign_deposits": {
+                "demand": [
+                    {
+                        "currency": "USD",
+                        "foreign_amount": {
+                            "value": 754.0,
+                            "source_page": 75,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 32.735,
+                            "source_page": 75,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": {
+                            "value": 24670.0,
+                            "source_page": 75,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "unit_is_thousand": true
+                    }
+                ],
+                "term": [],
+                "checking": [],
+                "unit_is_thousand": true
+            },
+            "marketable_instruments": {
+                "commercial_paper": {
+                    "value": 0.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "repurchase_agreement": {
+                    "value": 0.0,
+                    "source_page": 75,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "allowance_doubtful": {
+                "value": 0.0,
+                "source_page": 75,
+                "source_label": "現金及約當現金明細表"
+            },
+            "subtotal": null,
+            "total": {
+                "value": 97737.0,
+                "source_page": 75,
+                "source_label": "現金及約當現金明細表"
+            },
+            "unit_is_thousand": true
+        },
+        "total_liabilities": {
+            "domestic_bank_short_term_loans": {
+                "value": 4757978.0,
+                "source_page": 11,
+                "source_label": "資產負債表"
+            },
+            "domestic_bank_long_term_loans": {
+                "value": 33844692.0,
+                "source_page": 11,
+                "source_label": "資產負債表"
+            },
+            "unit_is_thousand": true
+        },
+        "receivables_related_parties": {
+            "accounts_receivable": {
+                "value": 1052671.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "notes_receivable": {
+                "value": 193377.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "other_receivables": {
+                "value": 214426.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "accounts_receivable_related_parties": {
+                "value": 4826344.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "other_receivables_related_parties": {
+                "value": 502554.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "unit_is_thousand": true
+        },
+        "prepayments": {
+            "prepayments_for_good": {
+                "value": 79385.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "prepayments_for_equipment": {
+                "value": 820154.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "unit_is_thousand": true
+        }
+    },
+    "113Q4 華碩財報(個體).pdf": {
+        "cash_equivalents": {
+            "cash": {
+                "on_hand": {
+                    "value": 150.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "petty_cash": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "revolving_fund": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "notes_for_exchange": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "in_transit": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "twd_deposit": {
+                "demand": {
+                    "value": 1686192.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "term": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "checking": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "foreign_deposits": {
+                "demand": [
+                    {
+                        "currency": "USD",
+                        "foreign_amount": {
+                            "value": 47534325.95,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 32.785,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": false
+                    },
+                    {
+                        "currency": "EUR",
+                        "foreign_amount": {
+                            "value": 37734.39,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 34.14,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": false
+                    },
+                    {
+                        "currency": "SGD",
+                        "foreign_amount": {
+                            "value": 200.05,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 24.13,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": false
+                    },
+                    {
+                        "currency": "CNY",
+                        "foreign_amount": {
+                            "value": 22305.6,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 4.478,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": false
+                    },
+                    {
+                        "currency": "GBP",
+                        "foreign_amount": {
+                            "value": 128.12,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 41.19,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": false
+                    },
+                    {
+                        "currency": "HKD",
+                        "foreign_amount": {
+                            "value": 5.78,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 4.222,
+                            "source_page": 54,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": false
+                    }
+                ],
+                "term": [],
+                "checking": [],
+                "unit_is_thousand": false
+            },
+            "marketable_instruments": {
+                "commercial_paper": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "repurchase_agreement": {
+                    "value": 0.0,
+                    "source_page": 54,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "allowance_doubtful": {
+                "value": 0.0,
+                "source_page": 54,
+                "source_label": "現金及約當現金明細表"
+            },
+            "subtotal": {
+                "value": 3246004.0,
+                "source_page": 54,
+                "source_label": "現金及約當現金明細表"
+            },
+            "total": {
+                "value": 3246154.0,
+                "source_page": 54,
+                "source_label": "現金及約當現金明細表"
+            },
+            "unit_is_thousand": true
+        },
+        "total_liabilities": {
+            "domestic_bank_short_term_loans": {
+                "value": 13300000.0,
+                "source_page": 11,
+                "source_label": "資產負債表"
+            },
+            "domestic_bank_long_term_loans": {
+                "value": 0.0,
+                "source_page": 11,
+                "source_label": "資產負債表"
+            },
+            "unit_is_thousand": true
+        },
+        "receivables_related_parties": {
+            "accounts_receivable": {
+                "value": 7880155.0,
+                "source_page": 55,
+                "source_label": "應收帳款明細表"
+            },
+            "notes_receivable": {
+                "value": 0.0,
+                "source_page": 55,
+                "source_label": "應收帳款明細表"
+            },
+            "other_receivables": {
+                "value": 576201.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "accounts_receivable_related_parties": {
+                "value": 66983323.0,
+                "source_page": 55,
+                "source_label": "應收帳款明細表"
+            },
+            "other_receivables_related_parties": {
+                "value": 0.0,
+                "source_page": 55,
+                "source_label": "應收帳款明細表"
+            },
+            "unit_is_thousand": true
+        },
+        "prepayments": {
+            "prepayments_for_good": {
+                "value": 5144763.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "prepayments_for_equipment": {
+                "value": 0.0,
+                "source_page": 10,
+                "source_label": "資產負債表"
+            },
+            "unit_is_thousand": true
+        }
+    },
+    "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf": {
+        "cash_equivalents": {
+            "cash": {
+                "on_hand": {
+                    "value": 0.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "petty_cash": {
+                    "value": 450.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "revolving_fund": {
+                    "value": 0.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "notes_for_exchange": {
+                    "value": 0.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "in_transit": {
+                    "value": 0.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "twd_deposit": {
+                "demand": {
+                    "value": 1218406,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "term": {
+                    "value": 664681500,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "checking": {
+                    "value": 0.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "foreign_deposits": {
+                "demand": [
+                    {
+                        "currency": "美元",
+                        "foreign_amount": {
+                            "value": 1687954.0,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 32.768,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": true
+                    },
+                    {
+                        "currency": "日圓",
+                        "foreign_amount": {
+                            "value": 65913663.0,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 0.2092,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": true
+                    },
+                    {
+                        "currency": "歐元",
+                        "foreign_amount": {
+                            "value": 3141.0,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 34.102,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": true
+                    }
+                ],
+                "term": [
+                    {
+                        "currency": "美元",
+                        "foreign_amount": {
+                            "value": 8133745.0,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 32.768,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": true
+                    },
+                    {
+                        "currency": "日圓",
+                        "foreign_amount": {
+                            "value": 50000000.0,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 0.2092,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": true
+                    },
+                    {
+                        "currency": "歐元",
+                        "foreign_amount": {
+                            "value": 580296.0,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "exchange_rate": {
+                            "value": 34.102,
+                            "source_page": 113,
+                            "source_label": "現金及約當現金明細表"
+                        },
+                        "twd_amount": null,
+                        "unit_is_thousand": true
+                    }
+                ],
+                "checking": [],
+                "unit_is_thousand": true
+            },
+            "marketable_instruments": {
+                "commercial_paper": {
+                    "value": 1998549.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "repurchase_agreement": {
+                    "value": 1179648.0,
+                    "source_page": 113,
+                    "source_label": "現金及約當現金明細表"
+                },
+                "unit_is_thousand": true
+            },
+            "allowance_doubtful": {
+                "value": 0.0,
+                "source_page": 113,
+                "source_label": "現金及約當現金明細表"
+            },
+            "subtotal": null,
+            "total": {
+                "value": 1035061499.0,
+                "source_page": 113,
+                "source_label": "現金及約當現金明細表"
+            },
+            "unit_is_thousand": true
+        },
+        "total_liabilities": {
+            "domestic_bank_short_term_loans": {
+                "value": 0.0,
+                "source_page": 7,
+                "source_label": "資產負債表"
+            },
+            "domestic_bank_long_term_loans": {
+                "value": 0.0,
+                "source_page": 7,
+                "source_label": "資產負債表"
+            },
+            "unit_is_thousand": true
+        },
+        "receivables_related_parties": {
+            "accounts_receivable": {
+                "value": 39497003.0,
+                "source_page": 31,
+                "source_label": "資產負債表"
+            },
+            "notes_receivable": {
+                "value": 0.0,
+                "source_page": 31,
+                "source_label": "資產負債表"
+            },
+            "other_receivables": {
+                "value": 0.0,
+                "source_page": 31,
+                "source_label": "資產負債表"
+            },
+            "accounts_receivable_related_parties": {
+                "value": 210300175.0,
+                "source_page": 115,
+                "source_label": "應收關係人款項明細表"
+            },
+            "other_receivables_related_parties": {
+                "value": 5313087.0,
+                "source_page": 65,
+                "source_label": "其他應收關係人款項"
+            },
+            "unit_is_thousand": true
+        },
+        "prepayments": {
+            "prepayments_for_good": {
+                "value": 0.0,
+                "source_page": 7,
+                "source_label": "資產負債表"
+            },
+            "prepayments_for_equipment": {
+                "value": 0.0,
+                "source_page": 7,
+                "source_label": "資產負債表"
+            },
+            "unit_is_thousand": true
+        }
+    }
+}
