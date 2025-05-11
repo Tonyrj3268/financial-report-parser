@@ -3,6 +3,8 @@ from .base import LabeledValue
 
 
 class PrePayments(BaseModel):
+    """預付款項"""
+
     prepayments_for_good: LabeledValue = Field(
         ...,
         alias="預付款項",

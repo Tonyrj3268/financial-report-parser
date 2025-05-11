@@ -3,6 +3,8 @@ from .base import LabeledValue
 
 
 class TotalLiabilities(BaseModel):
+    """負債總額"""
+
     domestic_bank_short_term_loans: LabeledValue = Field(
         ...,
         alias="國內金融機構借款-短期借款",

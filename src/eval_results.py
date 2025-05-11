@@ -9,6 +9,8 @@ OPTIONAL_PATHS = {
     "*/total",
     # 忽略所有 source_label 的缺失或不同
     "*/source_label",
+    # 忽略所有 source_page 的缺失或不同
+    "*/source_page",
 }
 
 # 在這裡定義貨幣的同義詞群組

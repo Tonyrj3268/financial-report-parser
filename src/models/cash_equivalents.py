@@ -22,6 +22,7 @@ class ForeignDeposit(BaseModel):
 
 
 class ForeignDeposits(BaseModel):
+    """外幣存款"""
 
     demand: List[ForeignDeposit] = Field(..., alias="外幣活期存款")
     term: List[ForeignDeposit] = Field(..., alias="外幣定期存款")
