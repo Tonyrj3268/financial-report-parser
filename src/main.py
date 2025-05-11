@@ -20,9 +20,9 @@ MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
 
 
 pdf_mapping = {
-    # "quartely-results-2024-zh_tcm27-94407.pdf": "file-KGXtvwDDkZ8wYCMRiAeRQg",  # 長榮航空
+    "quartely-results-2024-zh_tcm27-94407.pdf": "file-KGXtvwDDkZ8wYCMRiAeRQg",  # 長榮航空
     # "113Q4 華碩財報(個體).pdf": "file-FsNfKa6Ydbi2hRHKfW9TTw",  # 華碩
-    "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf": "file-LQokuRBxkg2CEp3PZiFBMf",  # 台積電
+    # "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf": "file-LQokuRBxkg2CEp3PZiFBMf",  # 台積電
     # "20240314171909745560928_tc.pdf": "file-X269JoL59QfurudTY48adv",  # 中信金
     # "fin_202503071324328842.pdf": "file-4YPtrJes7jpnUSRf7BVAx1",  # 統一
 }
@@ -88,21 +88,24 @@ async def process_wrapper(filename, modelname):
 async def main():
     results, failed = {}, {}
     check_results = {}  # 新增：用於存儲檢查結果
-    modelname = "cash_equivalents"
+    modelname = "financial_report"
     tasks = [process_wrapper(filename, modelname) for filename in pdf_mapping.keys()]
     for fut in asyncio.as_completed(tasks):
         fn, result, err = await fut
         if err:
             failed[fn] = err
         else:
-            # 將 Pydantic 模型轉換為字典
-            results[fn] = result.model_dump()
+
             # 執行檢查並保存結果
             check_result = await check_financial_report(
                 fn,
                 result,
                 model_prompt_mapping[modelname]["prompt"],
             )
+            if check_result["is_correct"]:
+                results[fn] = result.model_dump()
+            else:
+                results[fn] = check_result["fixed_json"]
             check_results[fn] = check_result
 
     # 保存解析結果
@@ -113,6 +116,10 @@ async def main():
     if failed:
         with open("failed.json", "w", encoding="utf-8") as f:
             json.dump(failed, f, ensure_ascii=False, indent=4)
+    # 保存檢查結果
+    if check_results:
+        with open("check_results.json", "w", encoding="utf-8") as f:
+            json.dump(check_results, f, ensure_ascii=False, indent=4)
 
 
 if __name__ == "__main__":

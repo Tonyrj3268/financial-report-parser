@@ -11,12 +11,14 @@ from pydantic import BaseModel, Field
 class FinancialReport(BaseModel):
     """財報"""
 
-    cash_equivalents: CashAndEquivalents = Field(..., alias="現金及約當現金明細表")
-    total_liabilities: TotalLiabilities = Field(..., alias="負債總額")  # 負債總額
-    receivables_related_parties: ReceivablesRelatedParties = Field(
-        ..., alias="應收帳款及應收票據明細表"
+    cash_equivalents: CashAndEquivalents = Field(
+        ..., description="現金及約當現金明細表"
     )
-    prepayments: PrePayments = Field(..., alias="預付款項明細表")
+    total_liabilities: TotalLiabilities = Field(..., description="負債總額")  # 負債總額
+    receivables_related_parties: ReceivablesRelatedParties = Field(
+        ..., description="應收帳款及應收票據明細表"
+    )
+    prepayments: PrePayments = Field(..., description="預付款項明細表")
 
 
 financial_report_prompt = (

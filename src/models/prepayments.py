@@ -7,17 +7,26 @@ class PrePayments(BaseModel):
 
     prepayments_for_good: LabeledValue = Field(
         ...,
-        alias="預付款項",
+        description="預付款項",
     )
     prepayments_for_equipment: LabeledValue = Field(
         ...,
-        alias="預付設備款",
+        description="預付設備款",
     )
-    unit_is_thousand: bool = Field(None, alias="單位是否為千元")
+    unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
 
 prepayments_prompt = """
 請你嚴格遵守以下指令，從提供的 PDF 中定位到「資產負債表」和其提到的相關附註或附錄，並回傳對應的純 JSON，欄位名稱請使用以下 alias（中文）：
+
+0. 共同結構說明
+- LabeledValue：凡屬金額或匯率欄位，一律使用  
+{ "value": <numeric>, "source_page": <list[int]>, "source_label": <list[原文欄位表名或原文頁名]> }  
+  其中 value 為數值，source_page 為頁碼，source_label 為原文欄位表名或原文頁名。  
+  source_page 和 source_label 都是 list 型別，當 source_page 有多個頁碼時，請用逗號分隔；當 source_label 有多個欄位時，請用逗號分隔。  
+  例如：{ "value": 1000, "source_page": [1,2], "source_label": ["現金及約當現金明細表", "現金明細表"] }  
+  若 source_page 和 source_label 都只有一個值，則還是得使用 list，例如：{ "value": 1000, "source_page": [1], "source_label": ["現金"] }  
+  如果在尋找value時，發現該欄位和其他頁數有關聯，請將該頁數也一併放入 source_page。例如當該數值後面寫了「備註２」，則請將「備註２」所在頁數也放入 source_page。
 
 1. 模型欄位結構  
    - **預付款項**： 數值為 { 金額 }，主要為預付給供應商的貨款

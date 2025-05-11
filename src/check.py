@@ -6,7 +6,6 @@ from pathlib import Path
 import json
 from transform import chat_with_file
 import tempfile
-import shutil
 import base64
 
 PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
@@ -18,9 +17,9 @@ CHECK_PROMPT = """
 
 請你：
 1. 仔細閱讀 PDF 中的相關頁面
-2. 比對 JSON 中的數據是否與 PDF 中的數據相符
+2. 比對 JSON 中的數據是否與 PDF 中的數據相符．如果相符可以不用回傳
 3. 特別注意：
-   - 數值是否正確
+   - 數值是否正確(要完全按照 PDF 中的數字，尤其是小數點和逗號不要搞混)
    - 單位是否正確（是否為千元）
    - 幣別是否正確
    - 匯率是否正確
@@ -36,7 +35,7 @@ CHECK_PROMPT = """
 
 請以以下格式回覆：
 {
-    "is_correct": boolean,  // 是否所有數據都正確
+    "is_correct": boolean(True or False),  // 是否所有數據都正確
     "issues": [  // 如果有問題，列出所有問題
         {
             "field": string,  // 有問題的欄位名稱
@@ -44,7 +43,10 @@ CHECK_PROMPT = """
             "json_value": any,  // JSON 中的值
             "description": string  // 問題描述
         }
-    ]
+    ],
+    "fixed_json": {  // 如果有問題，提供修正後的 JSON
+        // 修正後的 JSON 數據
+    }
 }
 """
 
@@ -79,18 +81,35 @@ def _extract_pages_recursive(
         if hasattr(field_value, "source_page"):
             page_number = field_value.source_page
             if page_number is not None:
-                # 將頁碼從 1-based 轉換為 0-based
-                zero_based_page = page_number - 1
-                # 確保頁碼在有效範圍內
-                if 0 <= zero_based_page < len(doc):
-                    # 如果該頁面已經記錄過，直接使用已記錄的信息
-                    if page_number in saved_pages:
-                        extracted_pages[current_prefix] = saved_pages[page_number]
-                    else:
-                        # 記錄頁面信息
-                        extracted_pages[current_prefix] = (page_number, current_prefix)
-                        saved_pages[page_number] = (page_number, current_prefix)
-
+                if isinstance(page_number, list):
+                    # 如果是列表，則提取所有頁碼
+                    for page in page_number:
+                        # 將頁碼從 1-based 轉換為 0-based
+                        zero_based_page = page - 1
+                        # 確保頁碼在有效範圍內
+                        if 0 <= zero_based_page < len(doc):
+                            # 如果該頁面已經記錄過，直接使用已記錄的信息
+                            if page in saved_pages:
+                                extracted_pages[current_prefix] = saved_pages[page]
+                            else:
+                                # 記錄頁面信息
+                                extracted_pages[current_prefix] = (page, current_prefix)
+                                saved_pages[page] = (page, current_prefix)
+                else:
+                    # 將頁碼從 1-based 轉換為 0-based
+                    zero_based_page = page_number - 1
+                    # 確保頁碼在有效範圍內
+                    if 0 <= zero_based_page < len(doc):
+                        # 如果該頁面已經記錄過，直接使用已記錄的信息
+                        if page_number in saved_pages:
+                            extracted_pages[current_prefix] = saved_pages[page_number]
+                        else:
+                            # 記錄頁面信息
+                            extracted_pages[current_prefix] = (
+                                page_number,
+                                current_prefix,
+                            )
+                            saved_pages[page_number] = (page_number, current_prefix)
         # 遞迴處理嵌套的 Pydantic model
         if isinstance(field_value, BaseModel):
             nested_pages = _extract_pages_recursive(
@@ -219,7 +238,7 @@ async def check_financial_report(
             # 將 model 轉換為 JSON 字符串
             model_json = json.dumps(model.model_dump(), ensure_ascii=False, indent=2)
 
-            prompt = f"{CHECK_PROMPT}\n\n以下是要檢查的 JSON 數據:\n```json\n{model_json}\n```\n以下是建立該模型時的規則\n{last_build_prompt}"
+            prompt = f"{CHECK_PROMPT}\n\n以下是建立該模型時的規則\n\n{last_build_prompt}\n\n以下是要檢查的 JSON 數據:\n```json\n{model_json}\n```"
 
             # 使用 GPT API 檢查數據
             result = await chat_with_file(pdf_name, base64_pdf, prompt)
