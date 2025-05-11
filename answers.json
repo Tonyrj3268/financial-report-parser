@@ -111,11 +111,6 @@
                 "source_page": 70,
                 "source_label": "現金及約當現金明細表"
             },
-            "subtotal": {
-                "value": 64947823.0,
-                "source_page": 70,
-                "source_label": "現金及約當現金明細表"
-            },
             "total": {
                 "value": 67923607.0,
                 "source_page": 70,
@@ -270,7 +265,6 @@
                 "source_page": 75,
                 "source_label": "現金及約當現金明細表"
             },
-            "subtotal": null,
             "total": {
                 "value": 97737.0,
                 "source_page": 75,
@@ -493,11 +487,6 @@
             },
             "allowance_doubtful": {
                 "value": 0.0,
-                "source_page": 54,
-                "source_label": "現金及約當現金明細表"
-            },
-            "subtotal": {
-                "value": 3246004.0,
                 "source_page": 54,
                 "source_label": "現金及約當現金明細表"
             },
@@ -727,7 +716,6 @@
                 "source_page": 113,
                 "source_label": "現金及約當現金明細表"
             },
-            "subtotal": null,
             "total": {
                 "value": 1035061499.0,
                 "source_page": 113,

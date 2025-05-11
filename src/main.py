@@ -10,8 +10,8 @@ from models.receivables_related_parties import (
     receivables_related_parties_prompt,
 )
 from pathlib import Path
-import concurrent.futures
 import json
+import asyncio
 
 PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
 MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
@@ -53,13 +53,13 @@ def get_markdown_path(pdf_path):
     return MD_DIR / (pdf_path.stem + ".md")
 
 
-def process(pdf_path, prompt, model, target_pages=None):
+async def process(pdf_path, prompt, model, target_pages=None):
     print(f"Processing {pdf_path}...")
     # Check if the PDF has fonts missing ToUnicode
     if not fonts_missing_tounicode(pdf_path):
         print(f"{pdf_path} chat gpt with file。")
-        file_id = pdf_mapping.get(pdf_path) or upload_file(pdf_path)
-        reply = chat_with_file(file_id, prompt, model)
+        file_id = pdf_mapping.get(pdf_path) or await upload_file(pdf_path)
+        reply = await chat_with_file(file_id, prompt, model)
     else:
         print(f"{pdf_path} chat gpt with markdown。")
         markdown_path = get_markdown_path(pdf_path)
@@ -69,38 +69,37 @@ def process(pdf_path, prompt, model, target_pages=None):
             save_path=str(markdown_path),
             replace=False,
         )
-        reply = chat_with_markdown(markdown, prompt, model)
+        reply = await chat_with_markdown(markdown, prompt, model)
     return reply
 
 
-def process_wrapper(filename, modelname):
+async def process_wrapper(filename, modelname):
     try:
         prompt = model_prompt_mapping[modelname]["prompt"]
         model = model_prompt_mapping[modelname]["model"]
-        res = process(PDF_DIR / filename, prompt, model)
+        res = await process(PDF_DIR / filename, prompt, model)
         return filename, res.model_dump(), None
     except Exception as e:
         return filename, None, str(e)
 
 
-if __name__ == "__main__":
+async def main():
     results, failed = {}, {}
     modelname = "financial_report"
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [
-            executor.submit(process_wrapper, filename, modelname)
-            for filename in pdf_mapping.keys()
-        ]
-        for fut in concurrent.futures.as_completed(futures):
-            fn, result, err = fut.result()
-            if err:
-                failed[fn] = err
-            else:
-                results[fn] = result
+    tasks = [process_wrapper(filename, modelname) for filename in pdf_mapping.keys()]
+    for fut in asyncio.as_completed(tasks):
+        fn, result, err = await fut
+        if err:
+            failed[fn] = err
+        else:
+            results[fn] = result
 
     with open("results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
-    # 若有失敗，也可另存
     if failed:
         with open("failed.json", "w", encoding="utf-8") as f:
             json.dump(failed, f, ensure_ascii=False, indent=4)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

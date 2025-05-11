@@ -72,7 +72,6 @@ class CashAndEquivalents(BaseModel):
     foreign_deposits: ForeignDeposits = Field(..., alias="外幣存款")
     marketable_instruments: MarketableInstrument = Field(..., alias="約當現金")
     allowance_doubtful: LabeledValue = Field(..., alias="備抵呆帳—存放銀行同業")
-    subtotal: Optional[LabeledValue] = Field(None, alias="小計")
     total: Optional[LabeledValue] = Field(None, alias="合計")
     # 單位是否為１０００
     unit_is_thousand: bool = Field(None, alias="單位是否為千元")
@@ -120,7 +119,6 @@ source_page 若無法判斷，填 null；source_label 若有，則必定按照�
      - 附買回交易  
      - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
    - **備抵呆帳—存放銀行同業** : 如果該數值用()表示，則請返回負數。
-   - **小計**  
    - **合計**  
 
    - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元

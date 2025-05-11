@@ -3,10 +3,11 @@ import os
 from pprint import pformat
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 from models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
+import asyncio
 
 # 設定 logging
 logging.basicConfig(
@@ -18,17 +19,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-def upload_file(file_path, purpose="user_data"):
-    file = client.files.create(file=open(file_path, "rb"), purpose=purpose)
+async def upload_file(file_path, purpose="user_data"):
+    file = await client.files.create(file=open(file_path, "rb"), purpose=purpose)
     return file.id
 
 
-def chat_with_file(file_id, text, response_format):
+async def chat_with_file(file_id, text, response_format):
     logger.info("與檔案互動，file_id=%s, prompt:\n%s", file_id, text)
-    response = client.beta.chat.completions.parse(
+    response = await client.beta.chat.completions.parse(
         model="gpt-4.1",
         messages=[
             {
@@ -62,9 +63,9 @@ def chat_with_file(file_id, text, response_format):
     return parsed
 
 
-def chat_with_markdown(markdown, text, response_format):
+async def chat_with_markdown(markdown, text, response_format):
     logger.info("與Markdown互動，Markdown=%s, prompt:\n%s", markdown, text)
-    response = client.beta.chat.completions.parse(
+    response = await client.beta.chat.completions.parse(
         model="gpt-4.1",
         messages=[
             {
@@ -96,16 +97,15 @@ def chat_with_markdown(markdown, text, response_format):
     return parsed
 
 
-if __name__ == "__main__":
-
-    file_id = upload_file("quartely-results-2024-zh_tcm27-94407.pdf")
+async def main():
+    # file_id = upload_file("quartely-results-2024-zh_tcm27-94407.pdf")
     # file_id = "file-X269JoL59QfurudTY48adv"  # 中信金
     # file_id = "file-LQokuRBxkg2CEp3PZiFBMf"  # 台積電
     # file_id = "file-FsNfKa6Ydbi2hRHKfW9TTw"  # 華碩
     # file_id = "file-4YPtrJes7jpnUSRf7BVAx1"  # 統一
-    # file_id = "file-KGXtvwDDkZ8wYCMRiAeRQg"  # 長榮航空
+    file_id = "file-KGXtvwDDkZ8wYCMRiAeRQg"  # 長榮航空
     print("File uploaded, id:", file_id)
-    reply = chat_with_file(file_id, cash_equivalents_prompt, CashAndEquivalents)
+    reply = await chat_with_file(file_id, cash_equivalents_prompt, CashAndEquivalents)
     # with open(
     #     "quartely-results-2024-zh_tcm27-94407.pdf.md", "r", encoding="utf-8"
     # ) as f:
@@ -115,3 +115,7 @@ if __name__ == "__main__":
 
     # reply = chat_with_file(file_id, total_liabilities_prompt, TotalLiabilities)
     # print("Origin: ", reply)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
