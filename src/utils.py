@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pikepdf
+from pydantic import BaseModel
 
 # 常見的標準編碼，缺少 ToUnicode 但仍能被閱讀器正確映射
 STD_ENCODINGS = {
@@ -50,6 +51,51 @@ def fonts_missing_tounicode(pdf_path: str | Path) -> bool:
                 if not has_to_unicode(font):
                     return True
     return False
+
+
+MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
+
+
+def get_markdown_path(pdf_path):
+    return MD_DIR / (pdf_path.stem + ".md")
+
+
+def get_spec_pages_from_markdown(res: BaseModel, pdf_path: str | Path) -> str:
+    # 提取所有相關頁數
+    all_pages = set()
+    for attr_name in res.__dict__:
+        if attr_name.endswith("_related_pages"):
+            page_list = getattr(res, attr_name)
+            if page_list:  # 確保頁數列表不為空
+                all_pages.update(page_list)
+
+    # 按數字順序排列頁數
+    sorted_pages = sorted(list(all_pages), key=int)
+    # 從原始 markdown 中提取對應頁數的內容
+    markdown_path = get_markdown_path(pdf_path)
+
+    with open(markdown_path, "r", encoding="utf-8") as f:
+        full_markdown = f.read()
+
+    # 分割 markdown 成頁
+    parts = full_markdown.split("START OF PAGE:")
+    pages = ["START OF PAGE:" + p for p in parts if p]
+
+    # 提取指定頁數的內容
+    extracted_pages = []
+    for page_num in sorted_pages:
+        for page_content in pages:
+            if page_content.startswith(f"START OF PAGE: {page_num}\n\n"):
+                extracted_pages.append(page_content)
+                break
+
+    # 處理第一頁的特殊情況（如果沒有前綴）
+    if pages and not pages[0].startswith("START OF PAGE: ") and "1" in sorted_pages:
+        extracted_pages.insert(0, pages[0])
+    # 生成新的 markdown 文件
+    combined_markdown = "\n======\n".join(extracted_pages)
+
+    return combined_markdown
 
 
 if __name__ == "__main__":

@@ -36,6 +36,7 @@ def parse_pdf(
         premium_mode=True,
         output_tables_as_HTML=True,
         target_pages=target_pages,
+        page_separator="\n======\nSTART OF PAGE: {pageNumber}\n\n",
     )
 
     # sync
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
     # Load environment variables from .env file
     load_dotenv()
-    pdf_path = PDF_DIR / "quartely-results-2024-zh_tcm27-94407.pdf"
+    pdf_path = PDF_DIR / "fin_202503071324328842.pdf"
     res = parse_pdf(
         pdf_path,
         target_pages="72-74",

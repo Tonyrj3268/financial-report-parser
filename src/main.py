@@ -1,5 +1,5 @@
-from utils import fonts_missing_tounicode
-from transform import upload_file, parse_with_file, parse_with_markdown
+from utils import fonts_missing_tounicode, get_spec_pages_from_markdown
+from transform import upload_file, chat_with_file, parse_with_markdown
 from parse import parse_pdf
 from models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
@@ -20,11 +20,11 @@ MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
 
 
 pdf_mapping = {
-    "quartely-results-2024-zh_tcm27-94407.pdf": "file-KGXtvwDDkZ8wYCMRiAeRQg",  # 長榮航空
+    # "quartely-results-2024-zh_tcm27-94407.pdf": "file-KGXtvwDDkZ8wYCMRiAeRQg",  # 長榮航空
     # "113Q4 華碩財報(個體).pdf": "file-FsNfKa6Ydbi2hRHKfW9TTw",  # 華碩
     # "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf": "file-LQokuRBxkg2CEp3PZiFBMf",  # 台積電
-    # "20240314171909745560928_tc.pdf": "file-X269JoL59QfurudTY48adv",  # 中信金
-    # "fin_202503071324328842.pdf": "file-4YPtrJes7jpnUSRf7BVAx1",  # 統一
+    # # "20240314171909745560928_tc.pdf": "file-X269JoL59QfurudTY48adv",  # 中信金
+    "fin_202503071324328842.pdf": "file-4YPtrJes7jpnUSRf7BVAx1",  # 統一
 }
 
 model_prompt_mapping = {
@@ -48,10 +48,6 @@ model_prompt_mapping = {
         "prompt": financial_report_prompt,
         "model": FinancialReport,
     },
-    "table_locations": {
-        "prompt": table_locations_prompt,
-        "model": FinancialReportPages,
-    },
 }
 
 
@@ -62,20 +58,29 @@ def get_markdown_path(pdf_path):
 async def process(pdf_path, prompt, model, target_pages=None) -> BaseModel:
     print(f"Processing {pdf_path}...")
     # Check if the PDF has fonts missing ToUnicode
-    if not fonts_missing_tounicode(pdf_path):
-        print(f"{pdf_path} chat gpt with file。")
-        file_id = pdf_mapping.get(pdf_path) or await upload_file(pdf_path)
-        reply = await parse_with_file(file_id, prompt, model)
-    else:
-        print(f"{pdf_path} chat gpt with markdown。")
-        markdown_path = get_markdown_path(pdf_path)
-        markdown = parse_pdf(
-            str(pdf_path),
-            target_pages=target_pages,
-            save_path=str(markdown_path),
-            replace=False,
-        )
-        reply = await parse_with_markdown(markdown, prompt, model)
+    # if not fonts_missing_tounicode(pdf_path):
+    #     print(f"{pdf_path} chat gpt with file。")
+    #     file_id = pdf_mapping.get(pdf_path) or upload_file(pdf_path)
+    #     reply = chat_with_file(file_id, prompt, model)
+    # else:
+    #     print(f"{pdf_path} chat gpt with markdown。")
+    #     markdown_path = get_markdown_path(pdf_path)
+    #     markdown = parse_pdf(
+    #         str(pdf_path),
+    #         target_pages=target_pages,
+    #         save_path=str(markdown_path),
+    #         replace=False,
+    #     )
+    #     reply = chat_with_markdown(markdown, prompt, model)
+    print(f"{pdf_path} chat gpt with markdown。")
+    markdown_path = get_markdown_path(pdf_path)
+    markdown = parse_pdf(
+        str(pdf_path),
+        target_pages=target_pages,
+        save_path=str(markdown_path),
+        replace=False,
+    )
+    reply = parse_with_markdown(markdown, prompt, model)
     return reply
 
 
@@ -89,42 +94,68 @@ async def process_wrapper(filename, modelname):
         return filename, None, str(e)
 
 
-async def main():
-    results, failed = {}, {}
-    check_results = {}  # 新增：用於存儲檢查結果
-    modelname = "financial_report"
-    tasks = [process_wrapper(filename, modelname) for filename in pdf_mapping.keys()]
-    for fut in asyncio.as_completed(tasks):
-        fn, result, err = await fut
-        if err:
-            failed[fn] = err
-        else:
+if __name__ == "__main__":
+    results = {}
+    for filename, file_id in pdf_mapping.items():
+        pdf_path = PDF_DIR / filename
+        prompt = model_prompt_mapping["financial_report"]["prompt"]
+        model = model_prompt_mapping["financial_report"]["model"]
+        res = process(pdf_path, prompt, model)
 
-            # 執行檢查並保存結果
-            check_result = await check_financial_report(
-                fn,
-                result,
-                model_prompt_mapping[modelname]["prompt"],
-            )
-            if check_result["is_correct"]:
-                results[fn] = result.model_dump()
-            else:
-                results[fn] = check_result["fixed_json"]
-            check_results[fn] = check_result
+        combined_markdown = get_spec_pages_from_markdown(res, pdf_path)
+
+        results[filename] = {}
+        for model_name in model_prompt_mapping.keys():
+            print(model_name)
+            if model_name == "financial_report":
+                continue
+            prompt = model_prompt_mapping[model_name]["prompt"]
+            model = model_prompt_mapping[model_name]["model"]
+            res = chat_with_markdown(combined_markdown, prompt, model)
+            results[filename][model_name] = res.model_dump()
+
+    import json
 
     # 保存解析結果
     with open("results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
 
-    # 保存失敗記錄
-    if failed:
-        with open("failed.json", "w", encoding="utf-8") as f:
-            json.dump(failed, f, ensure_ascii=False, indent=4)
-    # 保存檢查結果
-    if check_results:
-        with open("check_results.json", "w", encoding="utf-8") as f:
-            json.dump(check_results, f, ensure_ascii=False, indent=4)
+# async def main():
+#     results, failed = {}, {}
+#     check_results = {}  # 新增：用於存儲檢查結果
+#     modelname = "financial_report"
+#     tasks = [process_wrapper(filename, modelname) for filename in pdf_mapping.keys()]
+#     for fut in asyncio.as_completed(tasks):
+#         fn, result, err = await fut
+#         if err:
+#             failed[fn] = err
+#         else:
+
+#             # 執行檢查並保存結果
+#             check_result = await check_financial_report(
+#                 fn,
+#                 result,
+#                 model_prompt_mapping[modelname]["prompt"],
+#             )
+#             if check_result["is_correct"]:
+#                 results[fn] = result.model_dump()
+#             else:
+#                 results[fn] = check_result["fixed_json"]
+#             check_results[fn] = check_result
+
+#     # 保存解析結果
+#     with open("results.json", "w", encoding="utf-8") as f:
+#         json.dump(results, f, ensure_ascii=False, indent=4)
+
+#     # 保存失敗記錄
+#     if failed:
+#         with open("failed.json", "w", encoding="utf-8") as f:
+#             json.dump(failed, f, ensure_ascii=False, indent=4)
+#     # 保存檢查結果
+#     if check_results:
+#         with open("check_results.json", "w", encoding="utf-8") as f:
+#             json.dump(check_results, f, ensure_ascii=False, indent=4)
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
