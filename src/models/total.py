@@ -12,21 +12,10 @@ from typing import List
 class FinancialReport(BaseModel):
     """財報"""
 
-<<<<<<< HEAD
-    cash_equivalents: CashAndEquivalents = Field(
-        ..., description="現金及約當現金明細表"
-    )
-    total_liabilities: TotalLiabilities = Field(..., description="負債總額")  # 負債總額
-    receivables_related_parties: ReceivablesRelatedParties = Field(
-        ..., description="應收帳款及應收票據明細表"
-    )
-    prepayments: PrePayments = Field(..., description="預付款項明細表")
-=======
     cash_equivalents_related_pages: List[int]
     total_liabilities_related_pages: List[int]
     receivables_related_parties_related_pages: List[int]
     prepayments_related_pages: List[int]
->>>>>>> 77c4dcd (feat: Enhance financial report processing by adding related pages tracking and markdown extraction)
 
 
 financial_report_prompt = """
