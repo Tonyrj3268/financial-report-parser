@@ -72,7 +72,7 @@ async def process(pdf_path, prompt, model, target_pages=None) -> BaseModel:
     #         replace=False,
     #     )
     #     reply = chat_with_markdown(markdown, prompt, model)
-    print(f"{pdf_path} chat gpt with markdown。")
+    print(f"Chat gpt with markdown。")
     markdown_path = get_markdown_path(pdf_path)
     markdown = parse_pdf(
         str(pdf_path),
@@ -80,82 +80,67 @@ async def process(pdf_path, prompt, model, target_pages=None) -> BaseModel:
         save_path=str(markdown_path),
         replace=False,
     )
-    reply = parse_with_markdown(markdown, prompt, model)
+    print(f"Markdown parsed: {markdown_path}")
+    reply = await parse_with_markdown(markdown, prompt, model)
     return reply
 
 
 async def process_wrapper(filename, modelname):
     try:
-        prompt = model_prompt_mapping[modelname]["prompt"]
-        model = model_prompt_mapping[modelname]["model"]
-        res = await process(PDF_DIR / filename, prompt, model)
-        return filename, res, None
-    except Exception as e:
-        return filename, None, str(e)
-
-
-if __name__ == "__main__":
-    results = {}
-    for filename, file_id in pdf_mapping.items():
-        pdf_path = PDF_DIR / filename
+        # 先得到需要的頁數
         prompt = model_prompt_mapping["financial_report"]["prompt"]
         model = model_prompt_mapping["financial_report"]["model"]
-        res = process(pdf_path, prompt, model)
-
-        combined_markdown = get_spec_pages_from_markdown(res, pdf_path)
-
-        results[filename] = {}
+        res = await process(PDF_DIR / filename, prompt, model)
+        # 得到頁數後，把指定頁數的 markdown 內容傳給LLM
+        combined_markdown = get_spec_pages_from_markdown(res, PDF_DIR / filename)
+        results = {}
         for model_name in model_prompt_mapping.keys():
-            print(model_name)
             if model_name == "financial_report":
                 continue
             prompt = model_prompt_mapping[model_name]["prompt"]
             model = model_prompt_mapping[model_name]["model"]
-            res = chat_with_markdown(combined_markdown, prompt, model)
-            results[filename][model_name] = res.model_dump()
+            res = await parse_with_markdown(combined_markdown, prompt, model)
+            results[model_name] = res.model_dump()
+        return filename, results, None
+    except Exception as e:
+        return filename, None, str(e)
 
-    import json
 
+async def main():
+    results, failed = {}, {}
+    check_results = {}  # 新增：用於存儲檢查結果
+    modelname = "financial_report"
+    tasks = [process_wrapper(filename, modelname) for filename in pdf_mapping.keys()]
+    for fut in asyncio.as_completed(tasks):
+        fn, result, err = await fut
+        if err:
+            failed[fn] = err
+        else:
+            # 執行檢查並保存結果
+            # check_result = await check_financial_report(
+            #     fn,
+            #     result,
+            #     model_prompt_mapping[modelname]["prompt"],
+            # )
+            # if check_result["is_correct"]:
+            #     results[fn] = result.model_dump()
+            # else:
+            #     results[fn] = check_result["fixed_json"]
+            # check_results[fn] = check_result
+            results[fn] = result
     # 保存解析結果
     with open("results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
 
-# async def main():
-#     results, failed = {}, {}
-#     check_results = {}  # 新增：用於存儲檢查結果
-#     modelname = "financial_report"
-#     tasks = [process_wrapper(filename, modelname) for filename in pdf_mapping.keys()]
-#     for fut in asyncio.as_completed(tasks):
-#         fn, result, err = await fut
-#         if err:
-#             failed[fn] = err
-#         else:
-
-#             # 執行檢查並保存結果
-#             check_result = await check_financial_report(
-#                 fn,
-#                 result,
-#                 model_prompt_mapping[modelname]["prompt"],
-#             )
-#             if check_result["is_correct"]:
-#                 results[fn] = result.model_dump()
-#             else:
-#                 results[fn] = check_result["fixed_json"]
-#             check_results[fn] = check_result
-
-#     # 保存解析結果
-#     with open("results.json", "w", encoding="utf-8") as f:
-#         json.dump(results, f, ensure_ascii=False, indent=4)
-
-#     # 保存失敗記錄
-#     if failed:
-#         with open("failed.json", "w", encoding="utf-8") as f:
-#             json.dump(failed, f, ensure_ascii=False, indent=4)
-#     # 保存檢查結果
-#     if check_results:
-#         with open("check_results.json", "w", encoding="utf-8") as f:
-#             json.dump(check_results, f, ensure_ascii=False, indent=4)
+    # 保存失敗記錄
+    if failed:
+        with open("failed.json", "w", encoding="utf-8") as f:
+            json.dump(failed, f, ensure_ascii=False, indent=4)
+    # 保存檢查結果
+    if check_results:
+        with open("check_results.json", "w", encoding="utf-8") as f:
+            json.dump(check_results, f, ensure_ascii=False, indent=4)
 
 
-# if __name__ == "__main__":
-#     asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
