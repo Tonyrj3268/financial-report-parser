@@ -73,7 +73,6 @@ def get_spec_pages_from_markdown(res: BaseModel, pdf_path: str | Path) -> str:
     sorted_pages = sorted(list(all_pages), key=int)
     # 從原始 markdown 中提取對應頁數的內容
     markdown_path = get_markdown_path(pdf_path)
-
     with open(markdown_path, "r", encoding="utf-8") as f:
         full_markdown = f.read()
 
@@ -85,7 +84,7 @@ def get_spec_pages_from_markdown(res: BaseModel, pdf_path: str | Path) -> str:
     extracted_pages = []
     for page_num in sorted_pages:
         for page_content in pages:
-            if page_content.startswith(f"START OF PAGE: {page_num}\n\n"):
+            if page_content.startswith(f"START OF PAGE: {page_num}"):
                 extracted_pages.append(page_content)
                 break
 
@@ -94,7 +93,6 @@ def get_spec_pages_from_markdown(res: BaseModel, pdf_path: str | Path) -> str:
         extracted_pages.insert(0, pages[0])
     # 生成新的 markdown 文件
     combined_markdown = "\n======\n".join(extracted_pages)
-
     return combined_markdown
 
 

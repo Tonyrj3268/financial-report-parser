@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 
-def parse_pdf(
+async def parse_pdf(
     pdf_path: str,
     target_pages: Optional[str] = None,
     save_path: Optional[str] = None,
@@ -39,8 +39,7 @@ def parse_pdf(
         page_separator=str("\n======\nSTART OF PAGE: {pageNumber} \n\n"),
     )
 
-    # sync
-    result = parser.parse(
+    result = await parser.aparse(
         file_path=pdf_path,
     )
 

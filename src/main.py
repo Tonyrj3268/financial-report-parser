@@ -74,7 +74,7 @@ async def process(pdf_path, prompt, model, target_pages=None) -> BaseModel:
     #     reply = chat_with_markdown(markdown, prompt, model)
     print(f"Chat gpt with markdown。")
     markdown_path = get_markdown_path(pdf_path)
-    markdown = parse_pdf(
+    markdown = await parse_pdf(
         str(pdf_path),
         target_pages=target_pages,
         save_path=str(markdown_path),
