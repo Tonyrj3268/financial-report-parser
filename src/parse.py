@@ -36,7 +36,7 @@ def parse_pdf(
         premium_mode=True,
         output_tables_as_HTML=True,
         target_pages=target_pages,
-        page_separator="\n======\nSTART OF PAGE: {pageNumber}\n\n",
+        page_separator=str("\n======\nSTART OF PAGE: {pageNumber} \n\n"),
     )
 
     # sync
@@ -67,8 +67,8 @@ if __name__ == "__main__":
     pdf_path = PDF_DIR / "fin_202503071324328842.pdf"
     res = parse_pdf(
         pdf_path,
-        target_pages="72-74",
+        target_pages="0-2",
         save_path=MD_DIR / (pdf_path.stem + ".md"),
-        replace=False,
+        replace=True,
     )
     print(res)

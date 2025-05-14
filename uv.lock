@@ -545,7 +545,7 @@ wheels = [
 
 [[package]]
 name = "llama-cloud-services"
-version = "0.6.21"
+version = "0.6.22"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -555,9 +555,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9d/cd/7cd8683becf26e88bca91cb467d35171f59a6f80c3e55ab56486fbf17a55/llama_cloud_services-0.6.21.tar.gz", hash = "sha256:f99c9bae14172d0acb8cb8ca20016795c9f9b32141fc694be77700d096c64e24", size = 32166, upload-time = "2025-05-01T21:57:56.471Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/41/33d0cba969df8e09543eccec90f2af59463474db2418dbd26cd802b23cd1/llama_cloud_services-0.6.22.tar.gz", hash = "sha256:926b4ec6ffd5368b4a03e21b855842b098eaf96b71fe4b8c11cf3009a1429030", size = 32169, upload-time = "2025-05-08T17:50:19.751Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/12/8485afc9813574f0a1c9ca28df5dffa10e2fefa6cefddc73f4b3e36f0a5e/llama_cloud_services-0.6.21-py3-none-any.whl", hash = "sha256:f2982ab32884cd4b1774befb3eef56a1944c7a7c5b111a1d71c4d49ede8f7d3b", size = 37148, upload-time = "2025-05-01T21:57:55.173Z" },
+    { url = "https://files.pythonhosted.org/packages/24/26/cb45d9126ccf45376ea074ab472a0e55fc9f8dba8f113ac61a583acacb4a/llama_cloud_services-0.6.22-py3-none-any.whl", hash = "sha256:97844c7b85acba70a4214216213b432e9738e3818a0033d4a7134b5cf6fe7e22", size = 37150, upload-time = "2025-05-08T17:50:18.73Z" },
 ]
 
 [[package]]
