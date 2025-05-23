@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from .base import LabeledValue
+from .base import LabeledValue, convert_to_thousand
+import pandas as pd
 
 
 class PrePayments(BaseModel):
@@ -14,6 +15,33 @@ class PrePayments(BaseModel):
         description="預付設備款",
     )
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
+
+    def to_df(self):
+        return pd.DataFrame(
+            [
+                [
+                    "3.企業",
+                    "預付貨款",
+                    convert_to_thousand(
+                        self.prepayments_for_good.value, self.unit_is_thousand
+                    ),
+                    None,
+                    None,
+                    None,
+                ],
+                [
+                    "3.企業",
+                    "預付設備款",
+                    convert_to_thousand(
+                        self.prepayments_for_equipment.value, self.unit_is_thousand
+                    ),
+                    None,
+                    None,
+                    None,
+                ],
+            ],
+            columns=["部門", "項目", "金額", "", "", ""],
+        )
 
 
 prepayments_prompt = """

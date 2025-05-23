@@ -9,6 +9,11 @@ dependencies = [
     "google-genai>=1.14.0",
     "llama-cloud-services>=0.6.21",
     "openai>=1.76.0",
+    "pandas>=2.2.3",
+    "pandastable>=0.14.0",
     "pikepdf>=9.7.0",
     "pymupdf>=1.25.5",
+    "tabulate>=0.9.0",
+    "tksheet>=7.5.7",
+    "tktable>=0.2",
 ]

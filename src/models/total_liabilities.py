@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from .base import LabeledValue
+from .base import LabeledValue, convert_to_thousand
+import pandas as pd
 
 
 class TotalLiabilities(BaseModel):
@@ -14,6 +15,28 @@ class TotalLiabilities(BaseModel):
         description="國內金融機構借款-長期借款",
     )
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
+
+    def to_df(self):
+        return pd.DataFrame(
+            [
+                ["負債合計", "200000", None, None, None, None],
+                [
+                    "一、國內金融機構借款",
+                    "201000",
+                    convert_to_thousand(
+                        self.domestic_bank_short_term_loans.value,
+                        self.unit_is_thousand,
+                    ),
+                    convert_to_thousand(
+                        self.domestic_bank_long_term_loans.value,
+                        self.unit_is_thousand,
+                    ),
+                    None,
+                    None,
+                ],
+            ],
+            columns=["項目", "電腦代號", "時間", "", "", ""],
+        )
 
 
 total_liabilities_prompt = """

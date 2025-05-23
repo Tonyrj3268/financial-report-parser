@@ -97,7 +97,7 @@ async def parse_with_file(file_id, text, response_format) -> BaseModel:
     return parsed
 
 
-async def parse_with_markdown(markdown, text, response_format):
+async def parse_with_markdown(markdown, text, response_format) -> BaseModel:
     logger.info("與Markdown互動，Markdown=%s, prompt:\n%s", markdown, text)
     response = await client.beta.chat.completions.parse(
         model="gpt-4.1",

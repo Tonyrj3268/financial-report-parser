@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from .base import LabeledValue
+from .base import LabeledValue, convert_to_thousand
+import pandas as pd
 
 
 class ReceivablesRelatedParties(BaseModel):
@@ -38,6 +39,65 @@ class ReceivablesRelatedParties(BaseModel):
         None,
         description="單位是否為千元",
     )
+
+    def to_df(self):
+        return pd.DataFrame(
+            [
+                [
+                    "部門",
+                    "應收票據",
+                    convert_to_thousand(
+                        self.notes_receivable.value, self.unit_is_thousand
+                    ),
+                    None,
+                    None,
+                    None,
+                ],
+                [
+                    "部門",
+                    "應收帳款",
+                    convert_to_thousand(
+                        self.accounts_receivable.value, self.unit_is_thousand
+                    ),
+                    None,
+                    None,
+                    None,
+                ],
+                [
+                    "部門",
+                    "其他應收款",
+                    convert_to_thousand(
+                        self.other_receivables.value, self.unit_is_thousand
+                    ),
+                    None,
+                    None,
+                    None,
+                ],
+                [
+                    "部門",
+                    "應收關係人款項",
+                    convert_to_thousand(
+                        self.accounts_receivable_related_parties.value,
+                        self.unit_is_thousand,
+                    ),
+                    None,
+                    None,
+                    None,
+                ],
+                [
+                    "部門",
+                    "其他應收關係人款項",
+                    convert_to_thousand(
+                        self.other_receivables_related_parties.value,
+                        self.unit_is_thousand,
+                    ),
+                    None,
+                    None,
+                    None,
+                ],
+            ],
+            columns=["部門", "項目", "金額", "", "", ""],
+        )
 
 
 receivables_related_parties_prompt = """
