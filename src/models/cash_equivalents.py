@@ -314,7 +314,7 @@ class CashAndEquivalents(BaseModel):
 
 
 cash_equivalents_prompt = """
-請你嚴格遵守以下指令，從提供的 PDF 中定位到「現金及約當現金明細表」，並回傳對應的純 JSON：
+請你嚴格遵守以下指令，從提供的 PDF 中定位到 「重要會計項目明細表」 中的「現金及約當現金明細表」，並回傳對應的純 JSON：
 
 指令：抽取並回填「現金及約當現金明細表」
 
