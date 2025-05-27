@@ -1,11 +1,12 @@
 import PyPDF2
 import base64
 import io
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from google import genai
 import os
 from pydantic import BaseModel, Field
 import json
+from dotenv import load_dotenv
 
 # 導入模型
 from src.models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
@@ -16,26 +17,13 @@ from src.models.receivables_related_parties import (
 )
 from src.models.total_liabilities import TotalLiabilities, total_liabilities_prompt
 
-
-# Token使用統計
-class TokenUsage(BaseModel):
-    """Token使用統計"""
-
-    step_name: str = Field(description="步驟名稱")
-    input_tokens: int = Field(description="輸入token數")
-    output_tokens: int = Field(description="輸出token數")
-    total_tokens: int = Field(description="總token數")
-
+load_dotenv()
 
 class ProcessingResults(BaseModel):
     """處理結果統計"""
 
-    token_usage: List[TokenUsage] = Field(
-        default_factory=list, description="Token使用統計"
-    )
+    token_usage: List[int] = Field(default_factory=list, description="Token使用統計")
     model_results: Dict[str, Any] = Field(default_factory=dict, description="模型結果")
-    total_input_tokens: int = Field(default=0, description="總輸入token數")
-    total_output_tokens: int = Field(default=0, description="總輸出token數")
     total_tokens: int = Field(default=0, description="總token數")
 
 
@@ -52,16 +40,7 @@ def record_token_usage(step_name: str, response):
             output_tokens = getattr(usage, "candidates_token_count", 0)
             total_tokens = input_tokens + output_tokens
 
-            token_usage = TokenUsage(
-                step_name=step_name,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                total_tokens=total_tokens,
-            )
-
-            processing_stats.token_usage.append(token_usage)
-            processing_stats.total_input_tokens += input_tokens
-            processing_stats.total_output_tokens += output_tokens
+            processing_stats.token_usage.append(total_tokens)
             processing_stats.total_tokens += total_tokens
 
             print(
@@ -126,15 +105,7 @@ def display_final_summary():
 
     # Token使用統計
     print(f"\n💰 Token使用統計:")
-    print(f"總輸入Token: {processing_stats.total_input_tokens:,}")
-    print(f"總輸出Token: {processing_stats.total_output_tokens:,}")
     print(f"總Token數: {processing_stats.total_tokens:,}")
-
-    print(f"\n📊 各步驟Token使用詳情:")
-    for usage in processing_stats.token_usage:
-        print(
-            f"  {usage.step_name}: 輸入={usage.input_tokens:,}, 輸出={usage.output_tokens:,}, 總計={usage.total_tokens:,}"
-        )
 
     # 模型結果統計
     print(f"\n📈 模型處理結果:")
@@ -157,13 +128,6 @@ def display_final_summary():
         if (successful_models + failed_models) > 0
         else "N/A"
     )
-
-    # 估算費用（假設的費率，實際費率請參考Google AI的定價）
-    estimated_cost = (
-        processing_stats.total_input_tokens * 0.00015
-        + processing_stats.total_output_tokens * 0.0006
-    ) / 1000
-    print(f"\n💵 估算費用: ${estimated_cost:.4f} USD (僅供參考)")
 
     print("=" * 80)
 
@@ -201,68 +165,8 @@ class TableOfContentsInfo(BaseModel):
     """目錄頁資訊"""
 
     has_toc: bool = Field(description="是否有目錄頁")
-    toc_page_number: Optional[int] = Field(description="目錄頁的頁數")
+    toc_page_numbers: Optional[List[int]] = Field(description="目錄頁的頁數列表")
     notes: Optional[str] = Field(default=None, description="額外備註")
-
-
-def ask_gemini_for_financial_statements_pages(
-    base64_pdf: str,
-) -> Optional[FinancialStatementsAnalysis]:
-    """
-    使用Gemini模型分析PDF中財務報表項目的頁數位置
-
-    Args:
-        base64_pdf (str): base64編碼的PDF內容
-
-    Returns:
-        Optional[FinancialStatementsAnalysis]: 結構化的分析結果，如果失敗則返回None
-    """
-    try:
-        client = setup_gemini()
-        if not client:
-            return None
-
-        # 準備提示詞
-        prompt = """
-        請仔細分析這個PDF文件，找出以下財務報表項目分別在哪些頁數：
-
-        1. 個體資產負債表
-        2. 個體綜合損益表  
-        3. 個體權益變動表
-        4. 個體現金流量表
-        5. 重要會計項目明細表
-
-        注意：
-        - 頁數請從1開始計算
-        - 如果某個報表跨越多頁，請列出所有相關頁數
-        - 如果找不到某個項目，請將found設為false，page_numbers設為空陣列
-        """
-
-        # 準備PDF資料
-        pdf_part = {"inline_data": {"mime_type": "application/pdf", "data": base64_pdf}}
-
-        print("正在向Gemini模型查詢財務報表項目位置...")
-
-        # 發送請求給Gemini
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[prompt, pdf_part],
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": FinancialStatementsAnalysis,
-            },
-        )
-
-        print("Gemini分析完成！")
-
-        # 直接使用解析後的物件
-        result: FinancialStatementsAnalysis = response.parsed
-        return result
-
-    except Exception as e:
-        print(f"呼叫Gemini API時發生錯誤: {str(e)}")
-        return None
-
 
 # 設定Gemini API
 def setup_gemini():
@@ -275,50 +179,6 @@ def setup_gemini():
 
     client = genai.Client(api_key=api_key)
     return client
-
-
-def ask_gemini_about_table_of_contents(base64_pdf: str) -> Optional[str]:
-    """
-    使用Gemini模型分析PDF是否包含目錄頁
-
-    Args:
-        base64_pdf (str): base64編碼的PDF內容
-
-    Returns:
-        Optional[str]: Gemini的回應，如果失敗則返回None
-    """
-    try:
-        client = setup_gemini()
-        if not client:
-            return None
-
-        # 準備提示詞
-        prompt = """
-        請分析這個PDF文件的前十頁，告訴我是否包含目錄頁（Table of Contents）。
-        請回答：
-        1. 是否有目錄頁？（是/否）
-        2. 如果有，目錄頁在第幾頁？
-        3. 目錄的主要內容結構是什麼？
-        
-        請用繁體中文回答。
-        """
-
-        # 準備PDF資料
-        pdf_part = {"inline_data": {"mime_type": "application/pdf", "data": base64_pdf}}
-
-        print("正在向Gemini模型發送PDF進行分析...")
-
-        # 發送請求給Gemini
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-preview-05-20", contents=[prompt, pdf_part]
-        )
-
-        print("Gemini分析完成！")
-        return response.text
-
-    except Exception as e:
-        print(f"呼叫Gemini API時發生錯誤: {str(e)}")
-        return None
 
 
 def extract_first_ten_pages_to_base64(pdf_path: str) -> Optional[str]:
@@ -393,7 +253,9 @@ def find_table_of_contents_page(base64_pdf: str) -> Optional[TableOfContentsInfo
         1. 是否有目錄頁？
         2. 如果有，目錄頁在第幾頁？（從1開始計算）
         
-        注意：目錄頁通常包含章節標題和對應的頁數。
+        注意：
+        - 目錄頁通常包含章節標題和對應的頁數。
+        - 目錄頁可能包含多頁，請不要落下任何一頁。
         """
 
         pdf_part = {"inline_data": {"mime_type": "application/pdf", "data": base64_pdf}}
@@ -420,13 +282,13 @@ def find_table_of_contents_page(base64_pdf: str) -> Optional[TableOfContentsInfo
         return None
 
 
-def extract_specific_page_to_base64(pdf_path: str, page_number: int) -> Optional[str]:
+def extract_specific_page_to_base64(pdf_path: str, page_numbers: List[int]) -> Optional[str]:
     """
     提取PDF的特定頁面並轉換為base64編碼
 
     Args:
         pdf_path (str): PDF檔案路徑
-        page_number (int): 要提取的頁數（從1開始）
+        page_numbers (List[int]): 要提取的頁數列表（從1開始）
 
     Returns:
         Optional[str]: base64編碼的PDF頁面，如果失敗則返回None
@@ -436,14 +298,16 @@ def extract_specific_page_to_base64(pdf_path: str, page_number: int) -> Optional
             pdf_reader = PyPDF2.PdfReader(file)
 
             total_pages = len(pdf_reader.pages)
-            if page_number < 1 or page_number > total_pages:
-                print(f"錯誤: 頁數 {page_number} 超出範圍 (1-{total_pages})")
-                return None
+            for page_number in page_numbers:
+                if page_number < 1 or page_number > total_pages:
+                    print(f"錯誤: 頁數 {page_number} 超出範圍 (1-{total_pages})")
+                    return None
 
             # 建立新的PDF writer，只包含指定頁面
             pdf_writer = PyPDF2.PdfWriter()
-            page = pdf_reader.pages[page_number - 1]  # 轉換為0-based索引
-            pdf_writer.add_page(page)
+            for page_number in page_numbers:
+                page = pdf_reader.pages[page_number - 1]  # 轉換為0-based索引
+                pdf_writer.add_page(page)
 
             # 將頁面寫入記憶體
             output_buffer = io.BytesIO()
@@ -455,7 +319,7 @@ def extract_specific_page_to_base64(pdf_path: str, page_number: int) -> Optional
             # 轉換為base64編碼
             base64_encoded = base64.b64encode(pdf_bytes).decode("utf-8")
 
-            print(f"成功提取第 {page_number} 頁並轉換為base64編碼")
+            print(f"成功提取第 {page_numbers} 頁並轉換為base64編碼")
             return base64_encoded
 
     except FileNotFoundError:
@@ -503,6 +367,7 @@ def ask_gemini_about_toc_content(
         - 請根據目錄中顯示的頁數填寫
         - 如果找不到某個項目，請將found設為false
         - 如果某個報表跨越多頁，請列出所有相關頁數
+        - 重要會計項目明細表不等於重要會計項目之說明，請注意區分
         """
 
         toc_part = {
@@ -584,7 +449,60 @@ def extract_pages_range_to_base64(
         print(f"提取頁面時發生錯誤: {str(e)}")
         return None
 
+def extract_pages_range_to_base64_with_mapping(
+    pdf_path: str,
+    page_numbers: List[int],
+) -> Tuple[str, Dict[int, int], str]:
+    """
+    抽取多頁 PDF → 重新編號 → 回傳
+    1. base64 編碼後的合併 PDF
+    2. 新舊頁碼對照 dict   (key = 新順序, value = 原始頁碼)
+    3. 可直接塞到 Gemini prompt 的 system_hint
 
+    Args:
+        pdf_path (str): PDF 路徑
+        page_numbers (List[int]): 1-based 原始頁碼清單
+
+    Returns:
+        Tuple[str, Dict[int,int], str]:
+            (pages_base64, page_mapping, system_hint)
+        若失敗則 raise Exception
+    """
+    # 先排序、去重
+    unique_pages = sorted(set(page_numbers))
+    if not unique_pages:
+        raise ValueError("page_numbers 不能為空")
+
+    reader = PyPDF2.PdfReader(pdf_path)
+    total_pages = len(reader.pages)
+
+    writer = PyPDF2.PdfWriter()
+    page_mapping: Dict[int, int] = {}
+
+    for new_idx, orig_page in enumerate(unique_pages, start=1):
+        if orig_page < 1 or orig_page > total_pages:
+            raise ValueError(f"頁碼 {orig_page} 超出範圍 1-{total_pages}")
+        writer.add_page(reader.pages[orig_page - 1])
+        page_mapping[new_idx] = orig_page     # 建立對照表
+
+    # 合併後轉 base64
+    out_buf = io.BytesIO()
+    writer.write(out_buf)
+    pdf_bytes = out_buf.getvalue()
+    pages_base64 = base64.b64encode(pdf_bytes).decode()
+
+    # 產生 system hint
+    mapping_lines = [
+        f"新編號第 {new} 頁 = 原始頁碼第 {orig} 頁"
+        for new, orig in page_mapping.items()
+    ]
+    system_hint = (
+        "⚠️ **頁碼對照提醒**：以下 PDF 為節省 token 只抽取部分頁面。\n"
+        "請務必使用「原始頁碼」回答。\n\n"
+        + "\n".join(mapping_lines)
+    )
+
+    return pages_base64, page_mapping, system_hint
 def process_financial_models(
     pdf_path: str, financial_analysis: FinancialStatementsAnalysis
 ):
@@ -656,7 +574,13 @@ def process_financial_models(
     print(f"📄 總共需要提取的頁數: {relevant_pages}")
 
     # 提取相關頁面
-    pages_base64 = extract_pages_range_to_base64(pdf_path, relevant_pages)
+    pages_base64, page_mapping, system_hint = (
+    extract_pages_range_to_base64_with_mapping(pdf_path, relevant_pages)
+    )
+
+    pdf_part = {
+        "inline_data": {"mime_type": "application/pdf", "data": pages_base64}
+    }
 
     if not pages_base64:
         print("錯誤: 無法提取相關頁面")
@@ -698,7 +622,7 @@ def process_financial_models(
             # 發送請求給Gemini
             response = client.models.generate_content(
                 model="gemini-2.5-flash-preview-05-20",
-                contents=[model_config["prompt"], pdf_part],
+                contents=[system_hint, model_config["prompt"], pdf_part],
                 config={
                     "response_mime_type": "application/json",
                     "response_schema": model_config["model_class"],
@@ -996,15 +920,13 @@ if __name__ == "__main__":
     # 重置統計
     processing_stats.token_usage.clear()
     processing_stats.model_results.clear()
-    processing_stats.total_input_tokens = 0
-    processing_stats.total_output_tokens = 0
     processing_stats.total_tokens = 0
 
     print("🚀 開始處理財務報表...")
 
     # 請將 'your_pdf_file.pdf' 替換為實際的PDF檔案路徑
-    pdf_file_path = "assets\pdfs\TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf"
-
+    pdf_file_path = "assets/pdfs/quartely-results-2024-zh_tcm27-94407.pdf"
+    print(f"正在處理的PDF檔案路徑: {pdf_file_path}")
     # 步驟1: 提取PDF前5頁並轉換為base64
     result = extract_first_ten_pages_to_base64(pdf_file_path)
 
@@ -1015,15 +937,15 @@ if __name__ == "__main__":
         print("\n=== 尋找目錄頁位置 ===")
         toc_info = find_table_of_contents_page(result)
 
-        if toc_info and toc_info.has_toc and toc_info.toc_page_number:
-            print(f"Gemini建議目錄頁在第 {toc_info.toc_page_number} 頁")
+        if toc_info and toc_info.has_toc and toc_info.toc_page_numbers:
+            print(f"Gemini建議目錄頁在第 {toc_info.toc_page_numbers} 頁")
             if toc_info.notes:
                 print(f"備註: {toc_info.notes}")
 
             # 步驟3: 提取目錄頁
-            print(f"\n=== 提取第 {toc_info.toc_page_number} 頁目錄內容 ===")
+            print(f"\n=== 提取第 {toc_info.toc_page_numbers} 頁目錄內容 ===")
             toc_page_base64 = extract_specific_page_to_base64(
-                pdf_file_path, toc_info.toc_page_number
+                pdf_file_path, toc_info.toc_page_numbers
             )
 
             if toc_page_base64:
