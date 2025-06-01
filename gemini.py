@@ -11,7 +11,6 @@ import fitz
 from dotenv import load_dotenv
 from google import genai
 from pydantic import BaseModel, Field
-from spire.doc import Document, FileFormat
 
 from src.models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
 from src.models.prepayments import PrePayments, prepayments_prompt
@@ -373,6 +372,7 @@ def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> 
 
         # 創建新的PDF文檔
         new_doc = fitz.open()
+        from spire.doc import Document, FileFormat
 
         try:
             # 逐頁處理
@@ -436,11 +436,11 @@ def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> 
 
 
 for p in [
-    # "assets\\pdfs\\TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf",
-    "assets\pdfs\TSMC 2024Q4 Unconsolidated Financial Statements_C_converted.pdf"
-    # "assets\\pdfs\\fin_202503071324328842.pdf",
-    # "assets\\pdfs\\113Q4 華碩財報(個體).pdf",
+    # "assets/pdfs/TSMC 2024Q4 Unconsolidated Financial Statements_C_converted.pdf"
+    # "assets/pdfs/fin_202503071324328842.pdf",
+    # "assets/pdfs/113Q4 華碩財報(個體).pdf",
     # "assets\\pdfs\\202404_2736_AI3_20250528_205853.pdf",
+    "assets/pdfs/quartely-results-2024-zh_tcm27-94407.pdf",
 ]:
     # Retrieve and encode the PDF byte
     filepath = Path(p)
@@ -448,14 +448,11 @@ for p in [
 
     # 正確地提取所有財務報表的頁碼
     table_pages = toc_content.get_all_page_numbers()
-    print(f"找到的財務報表頁碼：{table_pages}")
-
     # 檢查是否為掃描文件
     scan_results = check_scanned_pages(filepath, table_pages) if table_pages else {}
     scanned_pages = [page for page, is_scan in scan_results.items() if is_scan]
 
     if scanned_pages:
-        print(f"{filepath.stem} 包含掃描頁面：{scanned_pages}")
         # 將掃描頁面轉換為Markdown
         try:
             markdown_content = convert_pdf_to_markdown(str(filepath), scanned_pages)
@@ -470,9 +467,6 @@ for p in [
                     f.write(content)
                     f.write("\n\n---\n\n")
 
-            print(f"掃描頁面已轉換為Markdown：{markdown_file_path}")
-            print(f"新的PDF檔案已生成：{new_pdf_path}")
-
             # 更新filepath為新的PDF檔案，以便後續處理
             filepath = Path(new_pdf_path)
 
@@ -480,40 +474,118 @@ for p in [
             print(f"轉換掃描頁面失敗：{e}")
             continue
 
-    print(f"{filepath.stem} 不包含掃描頁面")
-
-    # 如果沒有找到任何財務報表頁碼，跳過
-    if not table_pages:
-        print(f"{filepath.stem} 沒有找到財務報表頁碼")
-        continue
-
     pdf_part = {
         "inline_data": {
             "mime_type": "application/pdf",
-            "data": filepath.read_bytes(),
+            "data": base64.b64encode(filepath.read_bytes()).decode("utf-8"),
         }
     }
 
     # 刪除pdf_part
-    os.remove(filepath)
+    # os.remove(filepath)
     results = {}
-    for prompt, model in [
+
+    def process_model(prompt_model_pair):
+        """處理單個模型的分析"""
+        prompt, model = prompt_model_pair
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash-preview-05-20",
+                contents=[prompt, pdf_part],
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": model,
+                },
+            )
+            res = response.parsed
+            return model.__name__, res.model_dump()
+        except Exception as e:
+            print(f"{model.__name__} 分析失敗：{e}")
+            return model.__name__, None
+
+    # 準備所有模型和提示詞對
+    model_pairs = [
         (cash_equivalents_prompt, CashAndEquivalents),
         (prepayments_prompt, PrePayments),
         (receivables_related_parties_prompt, ReceivablesRelatedParties),
         (total_liabilities_prompt, TotalLiabilities),
-    ]:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-preview-05-20",
-            contents=[prompt, pdf_part],
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": model,
-            },
-        )
-        res = response.parsed
-        print(res)
-        results[model.__name__] = res.model_dump()
+    ]
+
+    # 使用ThreadPoolExecutor進行並行處理
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # 提交所有任務
+        future_to_model = {
+            executor.submit(process_model, pair): pair[1].__name__
+            for pair in model_pairs
+        }
+
+        # 收集結果
+        for future in as_completed(future_to_model):
+            model_name = future_to_model[future]
+            try:
+                result_name, result_data = future.result()
+                if result_data is not None:
+                    results[result_name] = result_data
+                    print(f"✓ {model_name} 處理完成")
+                else:
+                    print(f"✗ {model_name} 處理失敗")
+            except Exception as e:
+                print(f"✗ {model_name} 處理異常：{e}")
 
     with open(f"{filepath.stem}_results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=4, ensure_ascii=False)
+
+    # 將results轉換為易讀的文字格式
+    results_text = "\n\n## 已提取的財務數據：\n"
+    for model_name, data in results.items():
+        results_text += f"\n### {model_name}:\n"
+        if data:
+            results_text += json.dumps(data, indent=2, ensure_ascii=False)
+        else:
+            results_text += "提取失敗或無數據"
+        results_text += "\n"
+
+    # 檢查和驗證results
+    prompt = f"""
+    請分析這個財務報表PDF文件，並根據已提取的數據進行驗證和補充分析。
+
+    ## 任務要求：
+    1. **驗證已提取數據的準確性**：檢查下方提取的財務數據是否與PDF中的原始數據一致
+    2. **找出遺漏或錯誤的項目**：識別可能被遺漏或提取錯誤的財務數據
+    3. **數據一致性檢查**：確認各財務報表項目之間的邏輯一致性
+
+    ## 分析重點：
+    - 現金及約當現金項目的完整性和準確性
+    - 預付款項的分類和金額正確性  
+    - 關係人應收款項的詳細分析
+    - 負債總額的計算和分類正確性
+    
+    ## 輸出格式：
+    請以結構化的方式回應，包含：
+    1. **數據驗證結果**：已提取數據的準確性評估
+    2. **發現的問題**：錯誤、遺漏或不一致之處
+    3. **補充資訊**：PDF中其他重要的財務資訊
+    4. **建議改進**：數據提取可以改進的地方
+
+    ## 參考標準：
+    - 確保數字精確到小數點
+    - 注意貨幣單位（千元、萬元等）
+    - 檢查期間比較數據的一致性
+    - 驗證會計科目分類的正確性
+    - 優先以大表的數據為主，附註的數據為輔
+
+    {results_text}
+    """
+
+    # 呼叫Gemini API進行驗證和分析
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-preview-05-20", contents=[prompt, pdf_part]
+    )
+
+    # 保存驗證結果
+    verification_result = response.text
+    with open(f"{filepath.stem}_verification.md", "w", encoding="utf-8") as f:
+        f.write(f"# {filepath.stem} 財務數據驗證報告\n\n")
+        f.write(verification_result)
+
+    print(f"✓ 財務數據驗證完成，報告已保存至：{filepath.stem}_verification.md")
