@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from .base import LabeledValue, convert_to_thousand
 import pandas as pd
+from pydantic import BaseModel, Field
+
+from .base import LabeledValue, convert_to_thousand
 
 
 class TotalLiabilities(BaseModel):
@@ -51,10 +52,10 @@ total_liabilities_prompt = """
   若 source_page 和 source_label 都只有一個值，則還是得使用 list，例如：{ "value": 1000, "source_page": [1], "source_label": ["現金"] }  
   如果在尋找value時，發現該欄位和其他頁數有關聯，請將該頁數也一併放入 source_page。例如當該數值後面寫了「備註２」，則請將「備註２」所在頁數也放入 source_page。
 
-1. 模型欄位結構  
+1. 模型欄位定義  
    - **借款**：  
-     - 國內金融機構借款-短期借款: 每項包含 [金額]，主要為一年內到期的借款
-     - 國內金融機構借款-長期借款: 結構同上，主要為一年以上到期的借款
+     - 國內金融機構借款-短期借款: 指與國內金融機構簽訂借款合約時，原始借款期間為一年以內，且需支付利息者，歸屬於短期借款。
+     - 國內金融機構借款-長期借款: 指與國內金融機構簽訂借款合約時，原始借款期間超過一年，且需支付利息者。即便該筆借款在資產負債表日距到期日少於一年，財報上列為「一年內到期長期負債」（流動負債）者，仍視為長期借款項目。
 
    - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
 

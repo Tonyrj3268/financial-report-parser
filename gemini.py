@@ -1,9 +1,18 @@
-from google import genai
-from google.genai import types
-import pathlib
-import httpx
-from dotenv import load_dotenv
+import base64
+import json
 import os
+import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from pathlib import Path
+
+import fitz
+from dotenv import load_dotenv
+from google import genai
+from pydantic import BaseModel, Field
+from spire.doc import Document, FileFormat
+
 from src.models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
 from src.models.prepayments import PrePayments, prepayments_prompt
 from src.models.receivables_related_parties import (
@@ -11,12 +20,6 @@ from src.models.receivables_related_parties import (
     receivables_related_parties_prompt,
 )
 from src.models.total_liabilities import TotalLiabilities, total_liabilities_prompt
-import fitz
-import base64
-import io
-from pydantic import BaseModel, Field
-from spire.doc import Document, FileFormat, PageSize, PageOrientation
-from spire.doc.common import *
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -49,6 +52,28 @@ class FinancialStatementsAnalysis(BaseModel):
     important_accounting_items: FinancialStatementLocation = Field(
         description="重要會計項目明細表"
     )
+
+    def get_all_page_numbers(self) -> list[int]:
+        """
+        提取所有財務報表的頁碼
+
+        回傳：
+            list[int]: 排序後的不重複頁碼列表
+        """
+        all_pages = []
+        statements = [
+            self.individual_balance_sheet,
+            self.individual_comprehensive_income,
+            self.individual_equity_changes,
+            self.individual_cash_flow,
+            self.important_accounting_items,
+        ]
+
+        for statement in statements:
+            if statement.found and statement.page_numbers:
+                all_pages.extend(statement.page_numbers)
+
+        return sorted(list(set(all_pages)))
 
 
 # 檢查是否是掃描檔
@@ -184,13 +209,16 @@ def analyze_toc_and_extract_financial_statements(
         raise e
 
 
-def convert_pdf_to_markdown(pdf_path: str, pages: list[int]) -> dict[int, str]:
+def convert_pdf_to_markdown(
+    pdf_path: str, pages: list[int], max_workers: int = 4
+) -> dict[int, str]:
     """
-    將指定頁數的PDF轉換為Markdown格式
+    將指定頁數的PDF轉換為Markdown格式（使用多線程並行處理）
 
     參數：
         pdf_path (str): PDF檔案路徑
         pages (list[int]): 要轉換的頁數列表（1-based頁碼）
+        max_workers (int): 最大線程數，預設為4
 
     回傳：
         dict[int, str]: 以頁碼為key，value為轉換後的Markdown內容
@@ -200,7 +228,7 @@ def convert_pdf_to_markdown(pdf_path: str, pages: list[int]) -> dict[int, str]:
         doc = fitz.open(pdf_path)
         total_pages = doc.page_count
 
-        print(f"正在轉換PDF頁面 {pages} 為Markdown格式...")
+        print(f"正在轉換PDF頁面 {pages} 為Markdown格式")
 
         # 驗證頁碼範圍
         valid_pages = [p for p in pages if 1 <= p <= total_pages]
@@ -210,21 +238,23 @@ def convert_pdf_to_markdown(pdf_path: str, pages: list[int]) -> dict[int, str]:
 
         markdown_content = {}
 
-        # 對每個頁面單獨處理
-        for page in valid_pages:
-            try:
-                print(f"正在處理第 {page} 頁...")
+        # 創建線程鎖來保護共享資源
+        lock = threading.Lock()
 
+        def process_single_page(page: int) -> tuple[int, str]:
+            """處理單個頁面的轉換"""
+            try:
                 # 為每個頁面創建獨立的PDF文檔
-                single_page_doc = fitz.open()
-                single_page_doc.insert_pdf(doc, from_page=page - 1, to_page=page - 1)
+                with lock:  # 保護PDF文檔操作
+                    single_page_doc = fitz.open()
+                    single_page_doc.insert_pdf(
+                        doc, from_page=page - 1, to_page=page - 1
+                    )
+                    pdf_bytes = single_page_doc.tobytes()
+                    single_page_doc.close()
 
                 # 將單頁轉換為base64
-                pdf_bytes = single_page_doc.tobytes()
                 base64_content = base64.b64encode(pdf_bytes).decode("utf-8")
-
-                # 關閉單頁文檔
-                single_page_doc.close()
 
                 # 準備轉換為Markdown的提示詞
                 prompt = """
@@ -255,14 +285,25 @@ def convert_pdf_to_markdown(pdf_path: str, pages: list[int]) -> dict[int, str]:
                     model="gemini-2.5-flash-preview-05-20", contents=[prompt, pdf_part]
                 )
 
-                markdown_content[page] = response.text
                 print(f"第 {page} 頁轉換完成")
+                return page, response.text
 
             except Exception as page_error:
                 print(f"轉換第 {page} 頁時發生錯誤：{page_error}")
-                markdown_content[page] = (
-                    f"# 第 {page} 頁轉換失敗\n\n轉換錯誤：{str(page_error)}"
-                )
+                error_content = f"# 第 {page} 頁轉換失敗\n\n轉換錯誤：{str(page_error)}"
+                return page, error_content
+
+        # 使用ThreadPoolExecutor進行並行處理
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有任務
+            future_to_page = {
+                executor.submit(process_single_page, page): page for page in valid_pages
+            }
+
+            # 收集結果
+            for future in as_completed(future_to_page):
+                page_num, content = future.result()
+                markdown_content[page_num] = content
 
         # 關閉原始文檔
         doc.close()
@@ -281,6 +322,33 @@ def convert_pdf_to_markdown(pdf_path: str, pages: list[int]) -> dict[int, str]:
         raise e
 
 
+@contextmanager
+def temporary_files(*suffixes):
+    """
+    上下文管理器：創建多個臨時檔案，自動清理
+
+    參數：
+        *suffixes: 檔案後綴名列表
+
+    產出：
+        list[str]: 臨時檔案路徑列表
+    """
+    temp_files = []
+    try:
+        for suffix in suffixes:
+            temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+            temp_files.append(temp_file.name)
+            temp_file.close()
+        yield temp_files
+    finally:
+        # 清理所有臨時檔案
+        for temp_path in temp_files:
+            try:
+                os.unlink(temp_path)
+            except (OSError, FileNotFoundError):
+                pass  # 檔案可能已被刪除或不存在
+
+
 def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> str:
     """
     將Markdown內容轉換為PDF頁面，並替換原始PDF中的對應頁面
@@ -293,11 +361,6 @@ def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> 
         str: 新PDF檔案的路徑
     """
     try:
-        import tempfile
-        import os
-        from pathlib import Path
-        import re
-
         if not markdown_content:
             print("沒有Markdown內容需要轉換")
             return pdf_path
@@ -311,69 +374,59 @@ def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> 
         # 創建新的PDF文檔
         new_doc = fitz.open()
 
-        # 逐頁處理
-        for page_num in range(1, total_pages + 1):
-            if page_num in markdown_content:
-                print(f"正在轉換第 {page_num} 頁的Markdown內容...")
+        try:
+            # 逐頁處理
+            for page_num in range(1, total_pages + 1):
+                if page_num in markdown_content:
+                    print(f"正在轉換第 {page_num} 頁的Markdown內容...")
 
-                # 使用 Spire.Doc 進行轉換
-                markdown_text = markdown_content[page_num]
+                    # 使用上下文管理器處理臨時檔案
+                    with temporary_files(".md", ".pdf") as (
+                        temp_md_path,
+                        temp_pdf_path,
+                    ):
+                        # 寫入Markdown內容
+                        with open(temp_md_path, "w", encoding="utf-8") as f:
+                            f.write(markdown_content[page_num])
 
-                with tempfile.NamedTemporaryFile(
-                    mode="wb", suffix=".md", delete=False
-                ) as temp_md:
-                    temp_md_path = temp_md.name
-                    temp_md.write(markdown_text.encode("utf-8"))
+                        # 創建Word文檔並轉換
+                        word_doc = Document()
+                        try:
+                            word_doc.LoadFromFile(temp_md_path)
+                            word_doc.SaveToFile(temp_pdf_path, FileFormat.PDF)
+                        finally:
+                            word_doc.Dispose()
 
-                # 創建一個新的Word文檔
-                word_doc = Document()
-                word_doc.LoadFromFile(temp_md_path)
+                        # 讀取生成的PDF並插入到新文檔中
+                        converted_pdf = fitz.open(temp_pdf_path)
+                        try:
+                            new_doc.insert_pdf(converted_pdf)
+                        finally:
+                            converted_pdf.close()
 
-                # 創建臨時文件
-                with tempfile.NamedTemporaryFile(
-                    mode="wb", suffix=".pdf", delete=False
-                ) as temp_pdf:
-                    temp_pdf_path = temp_pdf.name
+                    print(f"第 {page_num} 頁轉換完成")
 
-                # 將Word文檔保存為PDF
-                word_doc.SaveToFile(temp_pdf_path, FileFormat.PDF)
+                else:
+                    # 保留原始頁面
+                    new_doc.insert_pdf(
+                        original_doc, from_page=page_num - 1, to_page=page_num - 1
+                    )
 
-                # 釋放資源
-                word_doc.Dispose()
+            # 生成新的檔案名稱
+            original_path = Path(pdf_path)
+            new_pdf_path = (
+                original_path.parent
+                / f"{original_path.stem}_converted{original_path.suffix}"
+            )
 
-                # 讀取生成的 PDF 並插入到新文檔中
-                converted_pdf = fitz.open(temp_pdf_path)
-                new_doc.insert_pdf(converted_pdf)
-                converted_pdf.close()
+            # 保存新的PDF
+            new_doc.save(str(new_pdf_path))
+            return str(new_pdf_path)
 
-                # 清理臨時檔案
-                os.unlink(temp_pdf_path)
-                os.unlink(temp_md_path)
-
-                print(f"第 {page_num} 頁轉換完成")
-
-            else:
-                # 保留原始頁面
-                new_doc.insert_pdf(
-                    original_doc, from_page=page_num - 1, to_page=page_num - 1
-                )
-
-        # 生成新的檔案名稱
-        original_path = Path(pdf_path)
-        new_pdf_path = (
-            original_path.parent
-            / f"{original_path.stem}_converted{original_path.suffix}"
-        )
-
-        # 保存新的PDF
-        new_doc.save(str(new_pdf_path))
-        new_doc.close()
-        original_doc.close()
-
-        print(f"PDF轉換完成！新檔案：{new_pdf_path}")
-        print(f"已替換 {len(markdown_content)} 個掃描頁面")
-
-        return str(new_pdf_path)
+        finally:
+            # 確保文檔被關閉
+            new_doc.close()
+            original_doc.close()
 
     except Exception as e:
         print(f"轉換Markdown為PDF時發生錯誤：{str(e)}")
@@ -390,25 +443,11 @@ for p in [
     # "assets\\pdfs\\202404_2736_AI3_20250528_205853.pdf",
 ]:
     # Retrieve and encode the PDF byte
-    filepath = pathlib.Path(p)
+    filepath = Path(p)
     toc_content = analyze_toc_and_extract_financial_statements(filepath)
 
     # 正確地提取所有財務報表的頁碼
-    table_pages = []
-    financial_statements = [
-        toc_content.individual_balance_sheet,
-        toc_content.individual_comprehensive_income,
-        toc_content.individual_equity_changes,
-        toc_content.individual_cash_flow,
-        toc_content.important_accounting_items,
-    ]
-
-    for statement in financial_statements:
-        if statement.found and statement.page_numbers:
-            table_pages.extend(statement.page_numbers)
-
-    # 移除重複頁碼並排序
-    table_pages = sorted(list(set(table_pages)))
+    table_pages = toc_content.get_all_page_numbers()
     print(f"找到的財務報表頁碼：{table_pages}")
 
     # 檢查是否為掃描文件
@@ -435,7 +474,7 @@ for p in [
             print(f"新的PDF檔案已生成：{new_pdf_path}")
 
             # 更新filepath為新的PDF檔案，以便後續處理
-            filepath = pathlib.Path(new_pdf_path)
+            filepath = Path(new_pdf_path)
 
         except Exception as e:
             print(f"轉換掃描頁面失敗：{e}")
@@ -475,8 +514,6 @@ for p in [
         res = response.parsed
         print(res)
         results[model.__name__] = res.model_dump()
-
-    import json
 
     with open(f"{filepath.stem}_results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=4, ensure_ascii=False)
