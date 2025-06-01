@@ -75,6 +75,22 @@ class FinancialStatementsAnalysis(BaseModel):
         return sorted(list(set(all_pages)))
 
 
+def call_gemini(
+    prompt: str, pdf_base64: str, schema: BaseModel | None = None
+) -> BaseModel | str:
+    payload = {"inline_data": {"mime_type": "application/pdf", "data": pdf_base64}}
+    contents = [prompt, payload]
+    cfg = {"response_mime_type": "application/json"}
+    if schema:
+        cfg["response_schema"] = schema
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-preview-05-20",
+        contents=contents,
+        config=cfg,
+    )
+    return response.parsed if schema else response.text
+
+
 # 檢查是否是掃描檔
 def check_scanned_pages(
     pdf_path: str, pages_to_check: list[int] | None = None, text_threshold: int = 1
@@ -180,25 +196,9 @@ def analyze_toc_and_extract_financial_statements(
         - 重要會計項目明細表不等於重要會計項目之說明，請注意區分
         """
 
-        # 準備PDF內容
-        pdf_part = {
-            "inline_data": {"mime_type": "application/pdf", "data": base64_content}
-        }
-
         print("正在分析目錄頁內容...")
 
-        # 呼叫Gemini API進行分析
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-preview-05-20",
-            contents=[prompt, pdf_part],
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": FinancialStatementsAnalysis,
-            },
-        )
-
-        result = response.parsed
-
+        result = call_gemini(prompt, base64_content, FinancialStatementsAnalysis)
         print("目錄分析完成！")
 
         return result
@@ -237,23 +237,16 @@ def convert_pdf_to_markdown(
 
         markdown_content = {}
 
-        # 創建線程鎖來保護共享資源
-        lock = threading.Lock()
+        valid_pages_base64 = [
+            base64.b64encode(doc.load_page(page - 1).get_pixmap().tobytes()).decode(
+                "utf-8"
+            )
+            for page in valid_pages
+        ]
 
-        def process_single_page(page: int) -> tuple[int, str]:
+        def process_single_page(page: int, base64_content: str) -> tuple[int, str]:
             """處理單個頁面的轉換"""
             try:
-                # 為每個頁面創建獨立的PDF文檔
-                with lock:  # 保護PDF文檔操作
-                    single_page_doc = fitz.open()
-                    single_page_doc.insert_pdf(
-                        doc, from_page=page - 1, to_page=page - 1
-                    )
-                    pdf_bytes = single_page_doc.tobytes()
-                    single_page_doc.close()
-
-                # 將單頁轉換為base64
-                base64_content = base64.b64encode(pdf_bytes).decode("utf-8")
 
                 # 準備轉換為Markdown的提示詞
                 prompt = """
@@ -269,23 +262,12 @@ def convert_pdf_to_markdown(
                 請直接返回Markdown格式的文本內容，不需要額外的格式包裝。
                 """
 
-                # 準備PDF內容
-                pdf_part = {
-                    "inline_data": {
-                        "mime_type": "application/pdf",
-                        "data": base64_content,
-                    }
-                }
-
                 print(f"正在呼叫Gemini API轉換第 {page} 頁...")
 
-                # 呼叫Gemini API進行轉換
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash-preview-05-20", contents=[prompt, pdf_part]
-                )
+                result = call_gemini(prompt, base64_content)
 
                 print(f"第 {page} 頁轉換完成")
-                return page, response.text
+                return page, result
 
             except Exception as page_error:
                 print(f"轉換第 {page} 頁時發生錯誤：{page_error}")
@@ -296,7 +278,8 @@ def convert_pdf_to_markdown(
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # 提交所有任務
             future_to_page = {
-                executor.submit(process_single_page, page): page for page in valid_pages
+                executor.submit(process_single_page, page, base64_content): page
+                for page, base64_content in zip(valid_pages, valid_pages_base64)
             }
 
             # 收集結果
@@ -489,16 +472,8 @@ for p in [
         """處理單個模型的分析"""
         prompt, model = prompt_model_pair
         try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash-preview-05-20",
-                contents=[prompt, pdf_part],
-                config={
-                    "response_mime_type": "application/json",
-                    "response_schema": model,
-                },
-            )
-            res = response.parsed
-            return model.__name__, res.model_dump()
+            result = call_gemini(prompt, pdf_part, model)
+            return model.__name__, result.model_dump()
         except Exception as e:
             print(f"{model.__name__} 分析失敗：{e}")
             return model.__name__, None
@@ -577,15 +552,10 @@ for p in [
     {results_text}
     """
 
-    # 呼叫Gemini API進行驗證和分析
-    response = client.models.generate_content(
-        model="gemini-2.5-flash-preview-05-20", contents=[prompt, pdf_part]
-    )
-
     # 保存驗證結果
-    verification_result = response.text
+    result = call_gemini(prompt, pdf_part)
     with open(f"{filepath.stem}_verification.md", "w", encoding="utf-8") as f:
         f.write(f"# {filepath.stem} 財務數據驗證報告\n\n")
-        f.write(verification_result)
+        f.write(result)
 
     print(f"✓ 財務數據驗證完成，報告已保存至：{filepath.stem}_verification.md")
