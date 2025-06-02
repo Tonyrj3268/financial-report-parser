@@ -228,25 +228,28 @@ def convert_pdf_to_markdown(
         total_pages = doc.page_count
 
         print(f"正在轉換PDF頁面 {pages} 為Markdown格式")
-
-        # 驗證頁碼範圍
         valid_pages = [p for p in pages if 1 <= p <= total_pages]
         if not valid_pages:
             doc.close()
             raise ValueError(f"沒有有效的頁碼。有效範圍：1-{total_pages}")
 
         markdown_content = {}
+        lock = threading.Lock()
 
-        valid_pages_base64 = [
-            base64.b64encode(doc.load_page(page - 1).get_pixmap().tobytes()).decode(
-                "utf-8"
-            )
-            for page in valid_pages
-        ]
-
-        def process_single_page(page: int, base64_content: str) -> tuple[int, str]:
+        def process_single_page(page: int) -> tuple[int, str]:
             """處理單個頁面的轉換"""
             try:
+                # 為每個頁面創建獨立的PDF文檔
+                with lock:  # 保護PDF文檔操作
+                    single_page_doc = fitz.open()
+                    single_page_doc.insert_pdf(
+                        doc, from_page=page - 1, to_page=page - 1
+                    )
+                    pdf_bytes = single_page_doc.tobytes()
+                    single_page_doc.close()
+
+                # 將單頁轉換為base64
+                base64_content = base64.b64encode(pdf_bytes).decode("utf-8")
 
                 # 準備轉換為Markdown的提示詞
                 prompt = """
@@ -278,8 +281,7 @@ def convert_pdf_to_markdown(
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # 提交所有任務
             future_to_page = {
-                executor.submit(process_single_page, page, base64_content): page
-                for page, base64_content in zip(valid_pages, valid_pages_base64)
+                executor.submit(process_single_page, page): page for page in valid_pages
             }
 
             # 收集結果
@@ -419,11 +421,12 @@ def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> 
 
 
 for p in [
-    # "assets/pdfs/TSMC 2024Q4 Unconsolidated Financial Statements_C_converted.pdf"
-    # "assets/pdfs/fin_202503071324328842.pdf",
-    # "assets/pdfs/113Q4 華碩財報(個體).pdf",
+    # "assets\\pdfs\\TSMC 2024Q4 Unconsolidated Financial Statements_C_converted.pdf"
+    "assets\\pdfs\\TSMC 2023Q4 Unconsolidated Financial Statements_C.pdf",
+    # "assets\\pdfs\\fin_202503071324328842.pdf",
+    # "assets\\pdfs\\113Q4 華碩財報(個體).pdf",
     # "assets\\pdfs\\202404_2736_AI3_20250528_205853.pdf",
-    "assets/pdfs/quartely-results-2024-zh_tcm27-94407.pdf",
+    # "assets\\pdfs\\quartely-results-2024-zh_tcm27-94407.pdf",
 ]:
     # Retrieve and encode the PDF byte
     filepath = Path(p)
@@ -457,12 +460,7 @@ for p in [
             print(f"轉換掃描頁面失敗：{e}")
             continue
 
-    pdf_part = {
-        "inline_data": {
-            "mime_type": "application/pdf",
-            "data": base64.b64encode(filepath.read_bytes()).decode("utf-8"),
-        }
-    }
+    pdf_data = base64.b64encode(filepath.read_bytes()).decode("utf-8")
 
     # 刪除pdf_part
     # os.remove(filepath)
@@ -472,7 +470,7 @@ for p in [
         """處理單個模型的分析"""
         prompt, model = prompt_model_pair
         try:
-            result = call_gemini(prompt, pdf_part, model)
+            result = call_gemini(prompt, pdf_data, model)
             return model.__name__, result.model_dump()
         except Exception as e:
             print(f"{model.__name__} 分析失敗：{e}")
@@ -522,7 +520,7 @@ for p in [
 
     # 檢查和驗證results
     prompt = f"""
-    請分析這個財務報表PDF文件，並根據已提取的數據進行驗證和補充分析。
+    你是專業的財務分析師，請分析這個財務報表PDF文件，並根據已提取的數據進行驗證和補充分析。
 
     ## 任務要求：
     1. **驗證已提取數據的準確性**：檢查下方提取的財務數據是否與PDF中的原始數據一致
@@ -536,7 +534,7 @@ for p in [
     - 負債總額的計算和分類正確性
     
     ## 輸出格式：
-    請以結構化的方式回應，包含：
+    請以Markdown的方式使用繁體中文回應，包含：
     1. **數據驗證結果**：已提取數據的準確性評估
     2. **發現的問題**：錯誤、遺漏或不一致之處
     3. **補充資訊**：PDF中其他重要的財務資訊
@@ -553,7 +551,7 @@ for p in [
     """
 
     # 保存驗證結果
-    result = call_gemini(prompt, pdf_part)
+    result = call_gemini(prompt, pdf_data)
     with open(f"{filepath.stem}_verification.md", "w", encoding="utf-8") as f:
         f.write(f"# {filepath.stem} 財務數據驗證報告\n\n")
         f.write(result)
