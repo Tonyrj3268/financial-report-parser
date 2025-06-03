@@ -1,16 +1,17 @@
 from pydantic import BaseModel, Field
 from .base import LabeledValue, convert_to_thousand
 import pandas as pd
+from typing import Optional
 
 
 class PrePayments(BaseModel):
     """預付款項"""
 
-    prepayments_for_good: LabeledValue = Field(
+    prepayments_for_good: Optional[LabeledValue] = Field(
         ...,
         description="預付款項",
     )
-    prepayments_for_equipment: LabeledValue = Field(
+    prepayments_for_equipment: Optional[LabeledValue] = Field(
         ...,
         description="預付設備款",
     )
@@ -49,17 +50,22 @@ prepayments_prompt = """
 
 0. 共同結構說明
 - LabeledValue：凡屬金額或匯率欄位，一律使用  
-{ "value": <numeric>, "source_page": <list[int]>, "source_label": <list[原文欄位表名或原文頁名]> }  
+{ "value": <numeric>, "source_page": <list[int]>, "source_label": <list[原文欄位表名或原文頁名]> , "reason": <str>}  
   其中 value 為數值，source_page 為頁碼，source_label 為原文欄位表名或原文頁名。  
   source_page 和 source_label 都是 list 型別，當 source_page 有多個頁碼時，請用逗號分隔；當 source_label 有多個欄位時，請用逗號分隔。  
   例如：{ "value": 1000, "source_page": [1,2], "source_label": ["現金及約當現金明細表", "現金明細表"] }  
   若 source_page 和 source_label 都只有一個值，則還是得使用 list，例如：{ "value": 1000, "source_page": [1], "source_label": ["現金"] }  
   如果在尋找value時，發現該欄位和其他頁數有關聯，請將該頁數也一併放入 source_page。例如當該數值後面寫了「備註２」，則請將「備註２」所在頁數也放入 source_page。
+  reason 為你從模型欄位定義中推斷出來的數值，請你嚴格遵守。
 
-1. 模型欄位結構  
-   - **預付款項**： 數值為 { 金額 }，主要為預付給供應商的貨款
+1. 模型欄位定義  
+   - **預付款項**：是指企業預先支付的各項成本或費用，包括預付費用及預付購料款等，通常屬於未來12個月內會實現者，列為流動資產。
+        如果預付款項的效益超過一年，例如長期預付租金、保險費、投資款、退休金、設備款等，則歸類為其他非流動資產。
+        若無特別標註，通常預付款項是位於[其他流動資產]或[其他非流動資產]下的一個子項目，但不表示流動資產或非流動資產一定為預付款項。
 
-   - **預付設備款**：數值為 { 金額 }，主要為預付給供應商的設備款
+   - **預付設備款**：預付設備款是企業依合約條款，為購置設備而預先支付的款項。
+        依IFRS規範，應依其性質分類為「其他非流動資產」項下（如預付設備款），或固定資產項下（如未完工程及待驗設備）。
+        若無特別標註，通常預付設備款是位於[其他非流動資產]下的一個子項目，但不表示非流動資產一定為預付設備款。
 
    - **單位是否為千元**：布林值，True 代表單位為千元，False 代表單位為元
 

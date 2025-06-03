@@ -6,6 +6,7 @@ class LabeledValue(BaseModel):
     value: float
     source_page: List[int]
     source_label: List[str]
+    reason: str
 
 
 def convert_to_thousand(value, is_thousand):

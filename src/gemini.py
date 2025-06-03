@@ -24,7 +24,7 @@ load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # 添加 PDF_DIR 和 model_prompt_mapping 以便 GUI 使用
-PDF_DIR = Path(__file__).parent / "assets/pdfs"
+PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
 
 model_prompt_mapping = {
     "cash_equivalents": {
@@ -442,13 +442,13 @@ def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> 
         sys.exit(1)
 
 
-def genetate_verification_report(results: dict, pdf_data) -> str:
+def genetate_verification_report(results: dict[str, BaseModel], pdf_data) -> str:
     # 將results轉換為易讀的文字格式
     results_text = "\n\n## 已提取的財務數據：\n"
     for model_name, data in results.items():
         results_text += f"\n### {model_name}:\n"
         if data:
-            results_text += json.dumps(data, indent=2, ensure_ascii=False)
+            results_text += data.model_dump_json()
         else:
             results_text += "提取失敗或無數據"
         results_text += "\n"
@@ -495,7 +495,9 @@ def genetate_verification_report(results: dict, pdf_data) -> str:
     return f"{filepath.stem}_verification.md"
 
 
-def process_single_pdf_with_gemini(filepath: Path, model_selection: list[str]) -> dict:
+def process_single_pdf_with_gemini(
+    filepath: Path, model_selection: list[str]
+) -> tuple[dict, str]:
     """
     使用 Gemini 處理單個 PDF 檔案的財務報表分析
 
@@ -503,7 +505,7 @@ def process_single_pdf_with_gemini(filepath: Path, model_selection: list[str]) -
         filepath: PDF 檔案路徑
 
     回傳:
-        dict: 包含所有模型分析結果的字典
+        tuple[dict, str]: 包含所有模型分析結果的字典和驗證報告的路徑
     """
     try:
         # 分析目錄並提取財務報表位置
@@ -529,14 +531,13 @@ def process_single_pdf_with_gemini(filepath: Path, model_selection: list[str]) -
 
         # 讀取PDF並轉換為base64
         pdf_data = base64.b64encode(filepath.read_bytes()).decode("utf-8")
-        results = {}
 
-        def process_model(prompt_model_pair):
+        def process_model(prompt_model_pair) -> tuple[str, BaseModel | None]:
             """處理單個模型的分析"""
             model, prompt = prompt_model_pair
             prompt = prompt + f"\n\n資料請優先以大表為主，附註為輔"
             try:
-                result = call_gemini(prompt, pdf_data, model)
+                result: BaseModel = call_gemini(prompt, pdf_data, model)
                 # 直接返回模型對象而不是字典
                 return model.__name__, result
             except Exception as e:
@@ -561,6 +562,7 @@ def process_single_pdf_with_gemini(filepath: Path, model_selection: list[str]) -
                 )
                 for model_name in model_prompt_mapping.keys()
             ]
+        results: dict[str, BaseModel] = {}
         # 使用ThreadPoolExecutor進行並行處理
         with ThreadPoolExecutor(max_workers=4) as executor:
             # 提交所有任務
@@ -588,21 +590,23 @@ def process_single_pdf_with_gemini(filepath: Path, model_selection: list[str]) -
 
     except Exception as e:
         print(f"處理 PDF 檔案時發生錯誤：{e}")
-        return {}
+        return {}, ""
 
 
 # 如果直接執行此檔案，運行測試
 if __name__ == "__main__":
     # 測試用的 PDF 檔案
     test_files = [
-        "fin_202503071324328842.pdf",
+        "TSMC 2024Q4 Unconsolidated Financial Statements_C_converted.pdf",
     ]
 
     for filename in test_files:
         filepath = PDF_DIR / filename
         if filepath.exists():
             print(f"測試處理檔案: {filename}")
-            results = process_single_pdf_with_gemini(filepath)
+            results, verification_report_path = process_single_pdf_with_gemini(
+                filepath, model_selection=model_prompt_mapping.keys()
+            )
 
             # 保存結果
             with open(

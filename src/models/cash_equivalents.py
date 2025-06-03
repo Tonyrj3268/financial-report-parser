@@ -324,13 +324,13 @@ cash_equivalents_prompt = """
 
 0. 共同結構說明
 - LabeledValue：凡屬金額或匯率欄位，一律使用  
-{ "value": <numeric>, "source_page": <list[int]>, "source_label": <list[原文欄位表名或原文頁名]> }  
+{ "value": <numeric>, "source_page": <list[int]>, "source_label": <list[原文欄位表名或原文頁名]> , "reason": <str>}  
   其中 value 為數值，source_page 為頁碼，source_label 為原文欄位表名或原文頁名。  
   source_page 和 source_label 都是 list 型別，當 source_page 有多個頁碼時，請用逗號分隔；當 source_label 有多個欄位時，請用逗號分隔。  
   例如：{ "value": 1000, "source_page": [1,2], "source_label": ["現金及約當現金明細表", "現金明細表"] }  
   若 source_page 和 source_label 都只有一個值，則還是得使用 list，例如：{ "value": 1000, "source_page": [1], "source_label": ["現金"] }  
   如果在尋找value時，發現該欄位和其他頁數有關聯，請將該頁數也一併放入 source_page。例如當該數值後面寫了「備註２」，則請將「備註２」所在頁數也放入 source_page。
-
+  reason 為你從模型欄位定義中推斷出來的數值，請你嚴格遵守。
 1. 模型欄位結構  
    - **現金**：  
      - 庫存現金  
