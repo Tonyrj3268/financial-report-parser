@@ -9,7 +9,7 @@ import sys
 from pandastable import Table, TableModel
 
 # 導入所需的模組
-from main import process_wrapper, model_prompt_mapping, PDF_DIR
+from gemini import process_single_pdf_with_gemini, model_prompt_mapping, PDF_DIR
 
 
 class FinancialReportParserGUI:
@@ -23,6 +23,7 @@ class FinancialReportParserGUI:
         self.selected_models = []
         self.results = {}
         self.current_df = None  # 儲存當前的DataFrame以供匯出使用
+        self.verification_report_path = None  # 儲存驗證報告路徑
 
         # 檢查是否有安裝 pandastable
         try:
@@ -102,6 +103,15 @@ class FinancialReportParserGUI:
             state=tk.DISABLED,
         )
         self.export_excel_button.pack(side=tk.RIGHT, padx=5)
+
+        # 添加下載驗證報告按鈕
+        self.download_report_button = ttk.Button(
+            button_frame,
+            text="下載驗證報告",
+            command=self.download_verification_report,
+            state=tk.DISABLED,
+        )
+        self.download_report_button.pack(side=tk.RIGHT, padx=5)
 
         # 狀態顯示
         status_frame = ttk.LabelFrame(top_frame, text="處理狀態", padding=10)
@@ -295,6 +305,8 @@ class FinancialReportParserGUI:
         self.process_button.config(state=tk.DISABLED)
         # 禁用匯出按鈕直到處理完成
         self.export_excel_button.config(state=tk.DISABLED)
+        # 禁用下載報告按鈕直到處理完成
+        self.download_report_button.config(state=tk.DISABLED)
 
         # 確保PDF存放目錄存在
         PDF_DIR.mkdir(parents=True, exist_ok=True)
@@ -318,18 +330,62 @@ class FinancialReportParserGUI:
         self.log("開始處理檔案...")
         threading.Thread(target=self.run_processing, daemon=True).start()
 
+    def download_verification_report(self):
+        """下載驗證報告"""
+        if (
+            not self.verification_report_path
+            or not Path(self.verification_report_path).exists()
+        ):
+            messagebox.showinfo("提示", "沒有可下載的驗證報告")
+            return
+
+        try:
+            # 請求用戶選擇保存位置
+            file_path = filedialog.asksaveasfilename(
+                title="保存驗證報告",
+                defaultextension=".md",
+                filetypes=[
+                    ("Markdown檔案", "*.md"),
+                    ("文本檔案", "*.txt"),
+                    ("所有檔案", "*.*"),
+                ],
+            )
+
+            if not file_path:  # 用戶取消了選擇
+                return
+
+            # 確保擴展名是.md
+            if not file_path.endswith(".md"):
+                file_path += ".md"
+
+            # 複製報告檔案
+            import shutil
+
+            shutil.copy2(self.verification_report_path, file_path)
+
+            self.log(f"驗證報告已複製到: {file_path}")
+            messagebox.showinfo("下載成功", f"驗證報告已保存到:\n{file_path}")
+
+        except Exception as e:
+            error_msg = f"下載驗證報告時發生錯誤: {str(e)}"
+            self.log(error_msg)
+            messagebox.showerror("錯誤", error_msg)
+
     def run_processing(self):
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            results, verification_report_path = process_single_pdf_with_gemini(
+                self.pdf_path, self.selected_models
+            )
 
-            # 始終需要financial_report模型來確定頁面
-            if "financial_report" not in self.selected_models:
-                self.selected_models.insert(0, "financial_report")
-                self.log("自動添加 financial_report 模型以確定頁面位置")
+            # 儲存驗證報告路徑
+            self.verification_report_path = verification_report_path
 
-            results = loop.run_until_complete(self.process_models())
-            loop.close()
+            # 如果生成了驗證報告，啟用下載按鈕
+            if verification_report_path and Path(verification_report_path).exists():
+                self.download_report_button.config(state=tk.NORMAL)
+                self.log(f"驗證報告已生成: {Path(verification_report_path).name}")
+            else:
+                self.download_report_button.config(state=tk.DISABLED)
 
             # 顯示結果
             self.display_results(results)
@@ -341,36 +397,6 @@ class FinancialReportParserGUI:
             self.log(f"處理時發生錯誤: {str(e)}")
             messagebox.showerror("錯誤", f"處理時發生錯誤:\n{str(e)}")
             self.process_button.config(state=tk.NORMAL)
-
-    async def process_models(self):
-        filename = self.pdf_path.name
-        results = {}
-
-        for model_name in self.selected_models:
-            if model_name not in model_prompt_mapping:
-                self.log(f"跳過未知模型: {model_name}")
-                continue
-
-            self.log(f"處理模型: {model_name}")
-            try:
-                if model_name == "financial_report":
-                    filename, all_results, err = await process_wrapper(
-                        filename, model_name
-                    )
-                    if err:
-                        self.log(f"處理 {model_name} 時出錯: {err}")
-                    else:
-                        # 只保留所選的模型結果
-                        for selected_model in self.selected_models:
-                            if selected_model in all_results:
-                                results[selected_model] = all_results[selected_model]
-                else:
-                    # 其他模型的處理已包含在 process_wrapper 中
-                    pass
-            except Exception as e:
-                self.log(f"處理 {model_name} 時出錯: {str(e)}")
-
-        return results
 
     def display_results(self, results):
         if not results:
