@@ -102,11 +102,12 @@ def call_gemini(
 ) -> BaseModel | str:
     payload = {"inline_data": {"mime_type": "application/pdf", "data": pdf_base64}}
     contents = [prompt, payload]
-    cfg = {"response_mime_type": "application/json"}
+    cfg = {}
     if schema:
+        cfg = {"response_mime_type": "application/json"}
         cfg["response_schema"] = schema
     response = client.models.generate_content(
-        model="gemini-2.5-flash-preview-05-20",
+        model=("gemini-2.5-flash-preview-05-20"),
         contents=contents,
         config=cfg,
     )
@@ -467,13 +468,6 @@ def genetate_verification_report(results: dict[str, BaseModel], pdf_data) -> str
     - 預付款項的分類和金額正確性  
     - 關係人應收款項的詳細分析
     - 負債總額的計算和分類正確性
-    
-    ## 輸出格式：
-    請以Markdown的方式使用繁體中文回應，包含：
-    1. **數據驗證結果**：已提取數據的準確性評估
-    2. **發現的問題**：錯誤、遺漏或不一致之處
-    3. **補充資訊**：PDF中其他重要的財務資訊
-    4. **建議改進**：數據提取可以改進的地方
 
     ## 參考標準：
     - 確保數字精確到小數點
@@ -483,6 +477,13 @@ def genetate_verification_report(results: dict[str, BaseModel], pdf_data) -> str
     - 優先以大表的數據為主，附註的數據為輔
 
     {results_text}
+
+    ## 輸出格式：
+    請以Markdown的方式使用繁體中文回應，包含：
+    1. **數據驗證結果**：已提取數據的準確性評估
+    2. **發現的問題**：錯誤、遺漏或不一致之處
+    3. **補充資訊**：PDF中其他重要的財務資訊
+    4. **建議改進**：數據提取可以改進的地方
     """
 
     # 保存驗證結果
@@ -597,7 +598,7 @@ def process_single_pdf_with_gemini(
 if __name__ == "__main__":
     # 測試用的 PDF 檔案
     test_files = [
-        "TSMC 2024Q4 Unconsolidated Financial Statements_C_converted.pdf",
+        "quartely-results-2024-zh_tcm27-94407.pdf",
     ]
 
     for filename in test_files:
