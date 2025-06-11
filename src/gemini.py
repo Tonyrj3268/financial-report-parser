@@ -10,6 +10,7 @@ from pathlib import Path
 import fitz
 from dotenv import load_dotenv
 from google import genai
+from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 
 from models.cash_equivalents import CashAndEquivalents, cash_equivalents_prompt
@@ -19,7 +20,6 @@ from models.receivables_related_parties import (
     receivables_related_parties_prompt,
 )
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
-from openpyxl import load_workbook
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -99,14 +99,14 @@ REPORTS_DIR = Path(__file__).parent.parent / "assets/reports"
 TEMPLATE_PATH = Path(__file__).parent.parent / "assets/template.xlsx"
 
 model_prompt_mapping = {
-    "cash_equivalents": {
-        "prompt": cash_equivalents_prompt,
-        "model": CashAndEquivalents,
-    },
-    # "total_liabilities": {
-    #     "prompt": total_liabilities_prompt,
-    #     "model": TotalLiabilities,
+    # "cash_equivalents": {
+    #     "prompt": cash_equivalents_prompt,
+    #     "model": CashAndEquivalents,
     # },
+    "total_liabilities": {
+        "prompt": total_liabilities_prompt,
+        "model": TotalLiabilities,
+    },
     # "prepayments": {
     #     "prompt": prepayments_prompt,
     #     "model": PrePayments,
@@ -688,9 +688,10 @@ def process_single_pdf_with_gemini(
                 except Exception as e:
                     print(f"✗ {model_name} 處理異常：{e}")
 
-        verification_report_path = genetate_verification_report(
-            results, pdf_data, filepath
-        )
+        # verification_report_path = genetate_verification_report(
+        #     results, pdf_data, filepath
+        # )
+        verification_report_path = ""
 
         # 計算本次處理使用的token
         end_tokens = token_tracker.get_summary()
@@ -764,7 +765,7 @@ if __name__ == "__main__":
 
     # 測試用的 PDF 檔案
     test_files = [
-        "quartely-results-2024-zh_tcm27-94407.pdf",
+        "fin_202503071324328842.pdf",
     ]
 
     for filename in test_files:
