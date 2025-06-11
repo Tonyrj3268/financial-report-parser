@@ -1,5 +1,6 @@
 import pandas as pd
 from pydantic import BaseModel, Field
+from openpyxl import Workbook
 
 from .base import LabeledValue, convert_to_thousand
 
@@ -17,27 +18,28 @@ class TotalLiabilities(BaseModel):
     )
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
-    def to_df(self):
-        return pd.DataFrame(
-            [
-                ["負債合計", "200000", None, None, None, None],
-                [
-                    "一、國內金融機構借款",
-                    "201000",
-                    convert_to_thousand(
-                        self.domestic_bank_short_term_loans.value,
-                        self.unit_is_thousand,
-                    ),
-                    convert_to_thousand(
-                        self.domestic_bank_long_term_loans.value,
-                        self.unit_is_thousand,
-                    ),
-                    None,
-                    None,
-                ],
-            ],
-            columns=["項目", "電腦代號", "時間", "", "", ""],
-        )
+    def fill_excel(self, wb: Workbook):
+        pass
+        # return pd.DataFrame(
+        #     [
+        #         ["負債合計", "200000", None, None, None, None],
+        #         [
+        #             "一、國內金融機構借款",
+        #             "201000",
+        #             convert_to_thousand(
+        #                 self.domestic_bank_short_term_loans.value,
+        #                 self.unit_is_thousand,
+        #             ),
+        #             convert_to_thousand(
+        #                 self.domestic_bank_long_term_loans.value,
+        #                 self.unit_is_thousand,
+        #             ),
+        #             None,
+        #             None,
+        #         ],
+        #     ],
+        #     columns=["項目", "電腦代號", "時間", "", "", ""],
+        # )
 
 
 total_liabilities_prompt = """

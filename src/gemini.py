@@ -19,30 +19,102 @@ from models.receivables_related_parties import (
     receivables_related_parties_prompt,
 )
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
+from openpyxl import load_workbook
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+
+# Token使用記錄器
+class TokenUsageTracker:
+    """Token使用記錄器"""
+
+    def __init__(self):
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.api_calls = 0
+        self.call_details = []
+        self._lock = threading.Lock()
+
+    def add_usage(
+        self, input_tokens: int, output_tokens: int, call_type: str = "unknown"
+    ):
+        """添加token使用記錄"""
+        with self._lock:
+            self.total_input_tokens += input_tokens
+            self.total_output_tokens += output_tokens
+            self.api_calls += 1
+            self.call_details.append(
+                {
+                    "call_type": call_type,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": input_tokens + output_tokens,
+                }
+            )
+
+    def get_summary(self) -> dict:
+        """獲取使用摘要"""
+        total_tokens = self.total_input_tokens + self.total_output_tokens
+        return {
+            "total_api_calls": self.api_calls,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_tokens": total_tokens,
+            "call_details": self.call_details,
+        }
+
+    def reset(self):
+        """重置計數器"""
+        with self._lock:
+            self.total_input_tokens = 0
+            self.total_output_tokens = 0
+            self.api_calls = 0
+            self.call_details = []
+
+    def print_summary(self):
+        """列印使用摘要"""
+        summary = self.get_summary()
+        print(f"\n📊 Token使用摘要：")
+        print(f"API呼叫次數：{summary['total_api_calls']}")
+        print(f"輸入Token：{summary['total_input_tokens']:,}")
+        print(f"輸出Token：{summary['total_output_tokens']:,}")
+        print(f"總計Token：{summary['total_tokens']:,}")
+
+        if summary["call_details"]:
+            print(f"\n詳細呼叫記錄：")
+            for i, detail in enumerate(summary["call_details"], 1):
+                print(
+                    f"  {i}. {detail['call_type']}: 輸入={detail['input_tokens']:,}, 輸出={detail['output_tokens']:,}, 總計={detail['total_tokens']:,}"
+                )
+
+
+# 全局token追蹤器
+token_tracker = TokenUsageTracker()
+
 # 添加 PDF_DIR 和 model_prompt_mapping 以便 GUI 使用
 PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
+RESULTS_DIR = Path(__file__).parent.parent / "assets/results"
+REPORTS_DIR = Path(__file__).parent.parent / "assets/reports"
+TEMPLATE_PATH = Path(__file__).parent.parent / "assets/template.xlsx"
 
 model_prompt_mapping = {
     "cash_equivalents": {
         "prompt": cash_equivalents_prompt,
         "model": CashAndEquivalents,
     },
-    "total_liabilities": {
-        "prompt": total_liabilities_prompt,
-        "model": TotalLiabilities,
-    },
-    "prepayments": {
-        "prompt": prepayments_prompt,
-        "model": PrePayments,
-    },
-    "receivables_related_parties": {
-        "prompt": receivables_related_parties_prompt,
-        "model": ReceivablesRelatedParties,
-    },
+    # "total_liabilities": {
+    #     "prompt": total_liabilities_prompt,
+    #     "model": TotalLiabilities,
+    # },
+    # "prepayments": {
+    #     "prompt": prepayments_prompt,
+    #     "model": PrePayments,
+    # },
+    # "receivables_related_parties": {
+    #     "prompt": receivables_related_parties_prompt,
+    #     "model": ReceivablesRelatedParties,
+    # },
 }
 
 
@@ -98,7 +170,10 @@ class FinancialStatementsAnalysis(BaseModel):
 
 
 def call_gemini(
-    prompt: str, pdf_base64: str, schema: BaseModel | None = None
+    prompt: str,
+    pdf_base64: str,
+    schema: BaseModel | None = None,
+    call_type: str = "unknown",
 ) -> BaseModel | str:
     payload = {"inline_data": {"mime_type": "application/pdf", "data": pdf_base64}}
     contents = [prompt, payload]
@@ -111,6 +186,16 @@ def call_gemini(
         contents=contents,
         config=cfg,
     )
+
+    # 記錄token使用量
+    if hasattr(response, "usage_metadata") and response.usage_metadata:
+        input_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+        output_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+        token_tracker.add_usage(input_tokens, output_tokens, call_type)
+        print(
+            f"🔧 {call_type}: 輸入={input_tokens:,} tokens, 輸出={output_tokens:,} tokens"
+        )
+
     return response.parsed if schema else response.text
 
 
@@ -221,7 +306,9 @@ def analyze_toc_and_extract_financial_statements(
 
         print("正在分析目錄頁內容...")
 
-        result = call_gemini(prompt, base64_content, FinancialStatementsAnalysis)
+        result = call_gemini(
+            prompt, base64_content, FinancialStatementsAnalysis, "目錄分析"
+        )
         print("目錄分析完成！")
 
         return result
@@ -290,7 +377,9 @@ def convert_pdf_to_markdown(
 
                 print(f"正在呼叫Gemini API轉換第 {page} 頁...")
 
-                result = call_gemini(prompt, base64_content)
+                result = call_gemini(
+                    prompt, base64_content, None, f"PDF轉Markdown_第{page}頁"
+                )
 
                 print(f"第 {page} 頁轉換完成")
                 return page, result
@@ -443,7 +532,9 @@ def convert_markdown_to_pdf(markdown_content: dict[int, str], pdf_path: str) -> 
         sys.exit(1)
 
 
-def genetate_verification_report(results: dict[str, BaseModel], pdf_data) -> str:
+def genetate_verification_report(
+    results: dict[str, BaseModel], pdf_data, filepath: Path
+) -> str:
     # 將results轉換為易讀的文字格式
     results_text = "\n\n## 已提取的財務數據：\n"
     for model_name, data in results.items():
@@ -487,28 +578,38 @@ def genetate_verification_report(results: dict[str, BaseModel], pdf_data) -> str
     """
 
     # 保存驗證結果
-    result = call_gemini(prompt, pdf_data)
-    with open(f"{filepath.stem}_verification.md", "w", encoding="utf-8") as f:
+    result = call_gemini(prompt, pdf_data, None, "驗證報告生成")
+
+    # 確保報告目錄存在
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 使用 REPORTS_DIR 保存驗證報告
+    report_path = REPORTS_DIR / f"{filepath.stem}_verification.md"
+    with open(report_path, "w", encoding="utf-8") as f:
         f.write(f"# {filepath.stem} 財務數據驗證報告\n\n")
         f.write(result)
 
-    print(f"✓ 財務數據驗證完成，報告已保存至：{filepath.stem}_verification.md")
-    return f"{filepath.stem}_verification.md"
+    print(f"✓ 財務數據驗證完成，報告已保存至：{report_path}")
+    return str(report_path)
 
 
 def process_single_pdf_with_gemini(
     filepath: Path, model_selection: list[str]
-) -> tuple[dict, str]:
+) -> tuple[dict, str, dict]:
     """
     使用 Gemini 處理單個 PDF 檔案的財務報表分析
 
     參數:
         filepath: PDF 檔案路徑
+        model_selection: 選擇的模型列表
 
     回傳:
-        tuple[dict, str]: 包含所有模型分析結果的字典和驗證報告的路徑
+        tuple[dict, str, dict]: 包含所有模型分析結果的字典、驗證報告的路徑和token使用資訊
     """
     try:
+        # 記錄處理開始時的token使用量
+        start_tokens = token_tracker.get_summary()
+
         # 分析目錄並提取財務報表位置
         toc_content = analyze_toc_and_extract_financial_statements(filepath)
 
@@ -538,7 +639,9 @@ def process_single_pdf_with_gemini(
             model, prompt = prompt_model_pair
             prompt = prompt + f"\n\n資料請優先以大表為主，附註為輔"
             try:
-                result: BaseModel = call_gemini(prompt, pdf_data, model)
+                result: BaseModel = call_gemini(
+                    prompt, pdf_data, model, f"財務分析_{model.__name__}"
+                )
                 # 直接返回模型對象而不是字典
                 return model.__name__, result
             except Exception as e:
@@ -585,17 +688,80 @@ def process_single_pdf_with_gemini(
                 except Exception as e:
                     print(f"✗ {model_name} 處理異常：{e}")
 
-        verification_report_path = genetate_verification_report(results, pdf_data)
+        verification_report_path = genetate_verification_report(
+            results, pdf_data, filepath
+        )
 
-        return results, verification_report_path
+        # 計算本次處理使用的token
+        end_tokens = token_tracker.get_summary()
+        process_tokens = {
+            "input_tokens": end_tokens["total_input_tokens"]
+            - start_tokens["total_input_tokens"],
+            "output_tokens": end_tokens["total_output_tokens"]
+            - start_tokens["total_output_tokens"],
+            "total_tokens": (
+                end_tokens["total_input_tokens"] + end_tokens["total_output_tokens"]
+            )
+            - (
+                start_tokens["total_input_tokens"] + start_tokens["total_output_tokens"]
+            ),
+            "api_calls": end_tokens["total_api_calls"]
+            - start_tokens["total_api_calls"],
+        }
+
+        return results, verification_report_path, process_tokens
 
     except Exception as e:
         print(f"處理 PDF 檔案時發生錯誤：{e}")
-        return {}, ""
+        return {}, "", {}
+
+
+def export_excel(results: dict[str, BaseModel], filepath: Path):
+    # 檢查模板檔案的格式
+    # if TEMPLATE_PATH.suffix.lower() == ".xls":
+    #     # 處理 .xls 格式
+    #     import pandas as pd
+    #     from openpyxl import Workbook
+
+    #     # 使用 pandas 讀取 .xls 檔案的所有工作表
+    #     df_dict = pd.read_excel(TEMPLATE_PATH, sheet_name=None)
+
+    #     # 創建新的 openpyxl 工作簿
+    #     wb = Workbook()
+    #     # 移除默認的工作表
+    #     wb.remove(wb.active)
+
+    #     # 將每個工作表轉換為 openpyxl 格式
+    #     for sheet_name, df in df_dict.items():
+    #         ws = wb.create_sheet(title=sheet_name)
+    #         # 將 DataFrame 寫入工作表
+    #         for row_idx, row in enumerate(df.values, 1):
+    #             for col_idx, value in enumerate(row, 1):
+    #                 ws.cell(
+    #                     row=row_idx + 1, column=col_idx, value=value
+    #                 )  # +1 因為要保留標題行
+    #         # 寫入標題行
+    #         for col_idx, col_name in enumerate(df.columns, 1):
+    #             ws.cell(row=1, column=col_idx, value=col_name)
+    # else:
+    #     # 處理 .xlsx 格式（原有邏輯）
+    #     wb = load_workbook(TEMPLATE_PATH, keep_vba=True)
+
+    wb = load_workbook(TEMPLATE_PATH)
+
+    for model in results.values():
+        # 把同一個 worksheet 傳給每個 model 寫入
+        model.fill_excel(wb)
+
+    # 全部填完後再存檔
+    wb.save("output.xlsx")
 
 
 # 如果直接執行此檔案，運行測試
 if __name__ == "__main__":
+    # 重置token計數器
+    token_tracker.reset()
+
     # 測試用的 PDF 檔案
     test_files = [
         "quartely-results-2024-zh_tcm27-94407.pdf",
@@ -605,14 +771,18 @@ if __name__ == "__main__":
         filepath = PDF_DIR / filename
         if filepath.exists():
             print(f"測試處理檔案: {filename}")
-            results, verification_report_path = process_single_pdf_with_gemini(
-                filepath, model_selection=model_prompt_mapping.keys()
+            results, verification_report_path, process_tokens = (
+                process_single_pdf_with_gemini(
+                    filepath, model_selection=model_prompt_mapping.keys()
+                )
             )
+            export_excel(results, "")
+            # 確保結果目錄存在
+            RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-            # 保存結果
-            with open(
-                f"{filepath.stem}_gemini_results.json", "w", encoding="utf-8"
-            ) as f:
+            # 使用 RESULTS_DIR 保存結果
+            results_path = RESULTS_DIR / f"{filepath.stem}_gemini_results.json"
+            with open(results_path, "w", encoding="utf-8") as f:
                 json_results = {}
                 for model_name, result in results.items():
                     if hasattr(result, "model_dump"):
@@ -621,6 +791,16 @@ if __name__ == "__main__":
                         json_results[model_name] = str(result)
                 json.dump(json_results, f, indent=4, ensure_ascii=False)
 
-            print(f"✓ 結果已保存到: {filepath.stem}_gemini_results.json")
+            print(f"✓ 結果已保存到: {results_path}")
+
+            # 顯示本次檔案處理的token使用情況
+            print(f"📊 本次處理 '{filename}' 的Token使用：")
+            print(f"   API呼叫：{process_tokens.get('api_calls', 0)} 次")
+            print(f"   輸入Token：{process_tokens.get('input_tokens', 0):,}")
+            print(f"   輸出Token：{process_tokens.get('output_tokens', 0):,}")
+            print(f"   總計Token：{process_tokens.get('total_tokens', 0):,}")
         else:
             print(f"✗ 檔案不存在: {filepath}")
+
+    # 顯示token使用摘要
+    token_tracker.print_summary()

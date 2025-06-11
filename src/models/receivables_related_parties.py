@@ -1,5 +1,6 @@
 import pandas as pd
 from pydantic import BaseModel, Field
+from openpyxl import Workbook
 
 from .base import LabeledValue, convert_to_thousand
 
@@ -41,64 +42,65 @@ class ReceivablesRelatedParties(BaseModel):
         description="單位是否為千元",
     )
 
-    def to_df(self):
-        return pd.DataFrame(
-            [
-                [
-                    "部門",
-                    "應收票據",
-                    convert_to_thousand(
-                        self.notes_receivable.value, self.unit_is_thousand
-                    ),
-                    None,
-                    None,
-                    None,
-                ],
-                [
-                    "部門",
-                    "應收帳款",
-                    convert_to_thousand(
-                        self.accounts_receivable.value, self.unit_is_thousand
-                    ),
-                    None,
-                    None,
-                    None,
-                ],
-                [
-                    "部門",
-                    "其他應收款",
-                    convert_to_thousand(
-                        self.other_receivables.value, self.unit_is_thousand
-                    ),
-                    None,
-                    None,
-                    None,
-                ],
-                [
-                    "部門",
-                    "應收關係人款項",
-                    convert_to_thousand(
-                        self.accounts_receivable_related_parties.value,
-                        self.unit_is_thousand,
-                    ),
-                    None,
-                    None,
-                    None,
-                ],
-                [
-                    "部門",
-                    "其他應收關係人款項",
-                    convert_to_thousand(
-                        self.other_receivables_related_parties.value,
-                        self.unit_is_thousand,
-                    ),
-                    None,
-                    None,
-                    None,
-                ],
-            ],
-            columns=["部門", "項目", "金額", "", "", ""],
-        )
+    def fill_excel(self, wb: Workbook):
+        pass
+        # return pd.DataFrame(
+        #     [
+        #         [
+        #             "部門",
+        #             "應收票據",
+        #             convert_to_thousand(
+        #                 self.notes_receivable.value, self.unit_is_thousand
+        #             ),
+        #             None,
+        #             None,
+        #             None,
+        #         ],
+        #         [
+        #             "部門",
+        #             "應收帳款",
+        #             convert_to_thousand(
+        #                 self.accounts_receivable.value, self.unit_is_thousand
+        #             ),
+        #             None,
+        #             None,
+        #             None,
+        #         ],
+        #         [
+        #             "部門",
+        #             "其他應收款",
+        #             convert_to_thousand(
+        #                 self.other_receivables.value, self.unit_is_thousand
+        #             ),
+        #             None,
+        #             None,
+        #             None,
+        #         ],
+        #         [
+        #             "部門",
+        #             "應收關係人款項",
+        #             convert_to_thousand(
+        #                 self.accounts_receivable_related_parties.value,
+        #                 self.unit_is_thousand,
+        #             ),
+        #             None,
+        #             None,
+        #             None,
+        #         ],
+        #         [
+        #             "部門",
+        #             "其他應收關係人款項",
+        #             convert_to_thousand(
+        #                 self.other_receivables_related_parties.value,
+        #                 self.unit_is_thousand,
+        #             ),
+        #             None,
+        #             None,
+        #             None,
+        #         ],
+        #     ],
+        #     columns=["部門", "項目", "金額", "", "", ""],
+        # )
 
 
 receivables_related_parties_prompt = """
@@ -123,6 +125,7 @@ receivables_related_parties_prompt = """
 
 2. 補充定義
    - 關係人通常包含：母子公司、關聯企業等。定義：若兩個或多個企業受同一個人/企業（或同一群人/企業）直接或間接控制，這些企業彼此間即為關係人（即使該控制人本身不參與經營）
+   - 以上五項皆為獨立的項目，請不要重複計算或包含彼此。
 注意事項
 最終輸出中的【所有】貨幣數值都以資料來源為主。
 欄位齊全：即使某些子欄位為 0 或空，也要列出並填入 0 或 null。

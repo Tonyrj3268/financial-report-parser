@@ -3,26 +3,26 @@ from __future__ import annotations
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
-from .base import LabeledValue, convert_to_thousand
-import pandas as pd
+from .base import LabeledValue, convert_to_thousand, BaseModelWithDefault
+from openpyxl import Workbook
 
 
-class ForeignDeposit(BaseModel):
+class ForeignDeposit(BaseModelWithDefault):
     """外幣存款"""
 
     # 幣別
     currency: str = Field(..., description="幣別")
     # 金額(外幣)
-    foreign_amount: LabeledValue = Field(..., description="金額(外幣)")
+    foreign_amount: Optional[LabeledValue] = Field(..., description="金額(外幣)")
     # 匯率
     exchange_rate: LabeledValue = Field(..., description="匯率")
     # 金額(新台幣)
-    twd_amount: Optional[LabeledValue] = Field(None, description="金額(新台幣)")
+    twd_amount: Optional[LabeledValue] = Field(..., description="金額(新台幣)")
     # 單位是否為１０００
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
 
-class ForeignDeposits(BaseModel):
+class ForeignDeposits(BaseModelWithDefault):
     """外幣存款"""
 
     demand_deposit: List[ForeignDeposit] = Field(..., description="外幣活期存款")
@@ -32,40 +32,40 @@ class ForeignDeposits(BaseModel):
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
 
-class TWDDeposit(BaseModel):
+class TWDDeposit(BaseModelWithDefault):
     """新台幣存款"""
 
     demand_deposit: Optional[LabeledValue] = Field(
-        None, description="活期性存款(新台幣)"
+        ..., description="活期性存款(新台幣)"
     )
-    time_deposit: Optional[LabeledValue] = Field(None, description="定期性存款(新台幣)")
+    time_deposit: Optional[LabeledValue] = Field(..., description="定期性存款(新台幣)")
     checking_deposit: Optional[LabeledValue] = Field(
-        None, description="支票存款(新台幣)"
+        ..., description="支票存款(新台幣)"
     )
     # 單位是否為１０００
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
 
-class BasicCash(BaseModel):
+class BasicCash(BaseModelWithDefault):
     """現金項目"""
 
-    on_hand: Optional[LabeledValue] = Field(None, description="庫存現金")
-    petty_cash: Optional[LabeledValue] = Field(None, description="零用金")
+    on_hand: Optional[LabeledValue] = Field(..., description="庫存現金")
+    petty_cash: Optional[LabeledValue] = Field(..., description="零用金")
     # 週轉金
-    revolving_fund: Optional[LabeledValue] = Field(None, description="週轉金")
-    notes_for_exchange: Optional[LabeledValue] = Field(None, description="待交換票據")
-    in_transit: Optional[LabeledValue] = Field(None, description="運送中現金")
+    revolving_fund: Optional[LabeledValue] = Field(..., description="週轉金")
+    notes_for_exchange: Optional[LabeledValue] = Field(..., description="待交換票據")
+    in_transit: Optional[LabeledValue] = Field(..., description="運送中現金")
     # 單位是否為１０００
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
 
-class MarketableInstrument(BaseModel):
+class MarketableInstrument(BaseModelWithDefault):
     """約當現金–商業本票／附買回交易"""
 
     # 商業本票
-    commercial_paper: Optional[LabeledValue] = Field(None, description="商業本票")
+    commercial_paper: Optional[LabeledValue] = Field(..., description="商業本票")
     # 附買回交易
-    repurchase_agreement: Optional[LabeledValue] = Field(None, description="附買回交易")
+    repurchase_agreement: Optional[LabeledValue] = Field(..., description="附買回交易")
     # 單位是否為１０００
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
@@ -77,244 +77,94 @@ class CashAndEquivalents(BaseModel):
     twd_deposit: TWDDeposit = Field(..., description="新台幣存款")
     foreign_deposits: ForeignDeposits = Field(..., description="外幣存款")
     marketable_instruments: MarketableInstrument = Field(..., description="約當現金")
-    allowance_doubtful: LabeledValue = Field(..., description="備抵呆帳—存放銀行同業")
+    allowance_doubtful: Optional[LabeledValue] = Field(
+        ..., description="備抵呆帳—存放銀行同業"
+    )
     total: Optional[LabeledValue] = Field(None, description="合計")
     # 單位是否為１０００
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
-    def to_df(self):
-        # 獲取前三大外幣活期存款
-        top_foreign_deposits = sorted(
-            self.foreign_deposits.demand_deposit,
-            key=lambda x: (
-                x.twd_amount.value
-                if x.twd_amount and x.twd_amount.value > 0
-                else (x.foreign_amount.value * x.exchange_rate.value)
-            ),
-            reverse=True,
+    def fill_excel(self, wb: Workbook):
+        # 資產表
+        ws_asset = wb["資產表"]
+
+        # 庫存現金及零用金
+        ws_asset["C8"] = (
+            convert_to_thousand(
+                self.cash.on_hand.value + self.cash.petty_cash.value,
+                self.cash.unit_is_thousand,
+            )
+            if (self.cash.on_hand.value + self.cash.petty_cash.value) > 0
+            else None
         )
-        if len(top_foreign_deposits) >= 3:
-            top_foreign_deposits = top_foreign_deposits[:3]
+        # 活期性存款(新台幣) 支票存款
+        ws_asset["C10"] = (
+            convert_to_thousand(
+                self.twd_deposit.checking_deposit.value,
+                self.twd_deposit.unit_is_thousand,
+            )
+            if self.twd_deposit.checking_deposit.value > 0
+            else convert_to_thousand(
+                self.twd_deposit.demand_deposit.value,
+                self.twd_deposit.unit_is_thousand,
+            )
+        )
+        # 活期性存款(新台幣) 活期存款
+        ws_asset["D10"] = (
+            convert_to_thousand(
+                self.twd_deposit.demand_deposit.value,
+                self.twd_deposit.unit_is_thousand,
+            )
+            if self.twd_deposit.checking_deposit.value > 0
+            else None
+        )
+        # 定期性存款(新台幣)
+        ws_asset["C11"] = (
+            convert_to_thousand(
+                self.twd_deposit.time_deposit.value,
+                self.twd_deposit.unit_is_thousand,
+            )
+            if self.twd_deposit.time_deposit.value > 0
+            else None
+        )
+
+        # 外匯活期及定期存款
+        def amount_in_twd(fd) -> float:
+            """將存款折算為台幣並做千元單位轉換。"""
+            raw = (
+                fd.twd_amount.value
+                if fd.twd_amount and fd.twd_amount.value > 0
+                else fd.foreign_amount.value * fd.exchange_rate.value
+            )
+            return convert_to_thousand(raw, fd.unit_is_thousand)
+
+        demand = self.foreign_deposits.demand_deposit
+        top_three = sorted(demand, key=amount_in_twd, reverse=True)[:3]
+        top_values = [amount_in_twd(fd) for fd in top_three] + [None] * (
+            3 - len(top_three)
+        )
 
         # 計算剩餘的活期存款、全部支票存款和定期存款的總和
         remaining_sum = sum(
-            [
-                *(
-                    [
-                        (
-                            convert_to_thousand(
-                                fd.twd_amount.value, fd.unit_is_thousand
-                            )
-                            if fd.twd_amount and fd.twd_amount.value > 0
-                            else convert_to_thousand(
-                                fd.foreign_amount.value * fd.exchange_rate.value,
-                                fd.unit_is_thousand,
-                            )
-                        )
-                        for fd in self.foreign_deposits.demand_deposit[3:]
-                    ]
-                    if len(self.foreign_deposits.demand_deposit) > 3
-                    else []
-                ),
-                *[
-                    (
-                        convert_to_thousand(fd.twd_amount.value, fd.unit_is_thousand)
-                        if fd.twd_amount and fd.twd_amount.value > 0
-                        else convert_to_thousand(
-                            fd.foreign_amount.value * fd.exchange_rate.value,
-                            fd.unit_is_thousand,
-                        )
-                    )
-                    for fd in self.foreign_deposits.checking_deposit
-                ],
-                *[
-                    (
-                        convert_to_thousand(fd.twd_amount.value, fd.unit_is_thousand)
-                        if fd.twd_amount and fd.twd_amount.value > 0
-                        else convert_to_thousand(
-                            fd.foreign_amount.value * fd.exchange_rate.value,
-                            fd.unit_is_thousand,
-                        )
-                    )
-                    for fd in self.foreign_deposits.time_deposit
-                ],
-            ]
-        )
-
-        # 獲取前三大外幣活期存款的值
-        top_values = [None, None, None]  # 初始化為三個None值
-
-        for i, fd in enumerate(top_foreign_deposits[:3]):
-            top_values[i] = (
-                convert_to_thousand(fd.twd_amount.value, fd.unit_is_thousand)
-                if fd.twd_amount and fd.twd_amount.value > 0
-                else convert_to_thousand(
-                    fd.foreign_amount.value * fd.exchange_rate.value,
-                    fd.unit_is_thousand,
-                )
+            amount_in_twd(fd)
+            for fd in (
+                demand[3:]
+                + self.foreign_deposits.checking_deposit
+                + self.foreign_deposits.time_deposit
             )
+        )
+        ws_asset["F12"] = None
 
-        top_value1, top_value2, top_value3 = top_values
+        # 填入前三大外幣活期存款
+        for col, val in zip(("C12", "D12", "E12"), top_values):
+            ws_asset[col] = val
 
-        # 創建DataFrame數據（每行使用四個單獨的列而非列表）
-        data = [
-            ["資產合計", "100000", None, None, None, None],
-            [
-                "一、庫存現金及零用金",
-                "101000",
-                (
-                    convert_to_thousand(
-                        self.cash.on_hand.value + self.cash.petty_cash.value,
-                        self.cash.unit_is_thousand,
-                    )
-                    if (self.cash.on_hand.value + self.cash.petty_cash.value) > 0
-                    else None
-                ),
-                None,
-                None,
-                None,
-            ],
-            [
-                "二、國內金融機構存款",
-                "102000",
-                None,
-                None,
-                None,
-                None,
-            ],
-            [
-                "1. 活期性存款(新台幣)",
-                "102010",
-                (
-                    convert_to_thousand(
-                        self.twd_deposit.checking_deposit.value,
-                        self.twd_deposit.unit_is_thousand,
-                    )
-                    if self.twd_deposit.checking_deposit.value > 0
-                    else convert_to_thousand(
-                        self.twd_deposit.demand_deposit.value,
-                        self.twd_deposit.unit_is_thousand,
-                    )
-                ),
-                (
-                    convert_to_thousand(
-                        self.twd_deposit.demand_deposit.value,
-                        self.twd_deposit.unit_is_thousand,
-                    )
-                    if self.twd_deposit.checking_deposit.value > 0
-                    else None
-                ),
-                None,
-                None,
-            ],
-            [
-                "2. 定期性存款(新台幣)",
-                "102020",
-                (
-                    convert_to_thousand(
-                        self.twd_deposit.time_deposit.value,
-                        self.twd_deposit.unit_is_thousand,
-                    )
-                    if self.twd_deposit.time_deposit.value > 0
-                    else None
-                ),
-                None,
-                None,
-                None,
-            ],
-            [
-                "3. 外匯活期及定期存款",
-                "102030",
-                top_value1,
-                top_value2,
-                top_value3,
-                remaining_sum,
-            ],
-            [
-                "三、約當現金",
-                "103000",
-                (
-                    convert_to_thousand(
-                        self.marketable_instruments.commercial_paper.value
-                        + self.marketable_instruments.repurchase_agreement.value,
-                        self.marketable_instruments.unit_is_thousand,
-                    )
-                    if (
-                        self.marketable_instruments.commercial_paper.value
-                        + self.marketable_instruments.repurchase_agreement.value
-                    )
-                    > 0
-                    else None
-                ),
-                None,
-                None,
-                None,
-            ],
-            [
-                "1. 商業本票",
-                "103010",
-                (
-                    convert_to_thousand(
-                        self.marketable_instruments.commercial_paper.value,
-                        self.marketable_instruments.unit_is_thousand,
-                    )
-                    if self.marketable_instruments.commercial_paper.value > 0
-                    else None
-                ),
-                None,
-                None,
-                None,
-            ],
-            [
-                "2. 附買回交易",
-                "103020",
-                (
-                    convert_to_thousand(
-                        self.marketable_instruments.repurchase_agreement.value,
-                        self.marketable_instruments.unit_is_thousand,
-                    )
-                    if self.marketable_instruments.repurchase_agreement.value > 0
-                    else None
-                ),
-                None,
-                None,
-                None,
-            ],
-            [
-                "四、備抵呆帳—存放銀行同業",
-                "104000",
-                (
-                    convert_to_thousand(
-                        self.allowance_doubtful.value,
-                        self.unit_is_thousand,
-                    )
-                    if self.allowance_doubtful.value != 0
-                    else None
-                ),
-                None,
-                None,
-                None,
-            ],
-            [
-                "合計",
-                "109999",
-                (
-                    convert_to_thousand(
-                        self.total.value if self.total else 0,
-                        self.unit_is_thousand,
-                    )
-                    if (self.total and self.total.value != 0)
-                    else None
-                ),
-                None,
-                None,
-                None,
-            ],
-        ]
-        # 建立 DataFrame 並設定列名
-        df = pd.DataFrame(data, columns=["項目", "電腦代號", "時間", "", "", ""])
-
-        return df
+        # 找第一個空位放 remaining_sum
+        if remaining_sum > 0:
+            for col in ("C12", "D12", "E12", "F12"):
+                if ws_asset[col].value is None:
+                    ws_asset[col] = remaining_sum
+                    break
 
 
 cash_equivalents_prompt = """
