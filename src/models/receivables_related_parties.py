@@ -4,6 +4,8 @@ from openpyxl import Workbook
 
 from .base import LabeledValue, convert_to_thousand
 
+# from ..utils import get_export_ratio
+
 
 class ReceivablesRelatedParties(BaseModel):
     """應收帳款及應收票據明細表"""
@@ -44,63 +46,6 @@ class ReceivablesRelatedParties(BaseModel):
 
     def fill_excel(self, wb: Workbook):
         pass
-        # return pd.DataFrame(
-        #     [
-        #         [
-        #             "部門",
-        #             "應收票據",
-        #             convert_to_thousand(
-        #                 self.notes_receivable.value, self.unit_is_thousand
-        #             ),
-        #             None,
-        #             None,
-        #             None,
-        #         ],
-        #         [
-        #             "部門",
-        #             "應收帳款",
-        #             convert_to_thousand(
-        #                 self.accounts_receivable.value, self.unit_is_thousand
-        #             ),
-        #             None,
-        #             None,
-        #             None,
-        #         ],
-        #         [
-        #             "部門",
-        #             "其他應收款",
-        #             convert_to_thousand(
-        #                 self.other_receivables.value, self.unit_is_thousand
-        #             ),
-        #             None,
-        #             None,
-        #             None,
-        #         ],
-        #         [
-        #             "部門",
-        #             "應收關係人款項",
-        #             convert_to_thousand(
-        #                 self.accounts_receivable_related_parties.value,
-        #                 self.unit_is_thousand,
-        #             ),
-        #             None,
-        #             None,
-        #             None,
-        #         ],
-        #         [
-        #             "部門",
-        #             "其他應收關係人款項",
-        #             convert_to_thousand(
-        #                 self.other_receivables_related_parties.value,
-        #                 self.unit_is_thousand,
-        #             ),
-        #             None,
-        #             None,
-        #             None,
-        #         ],
-        #     ],
-        #     columns=["部門", "項目", "金額", "", "", ""],
-        # )
 
 
 receivables_related_parties_prompt = """

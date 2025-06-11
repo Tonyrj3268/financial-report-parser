@@ -20,9 +20,19 @@ from models.receivables_related_parties import (
     receivables_related_parties_prompt,
 )
 from models.total_liabilities import TotalLiabilities, total_liabilities_prompt
-
-load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+from models.corporate_bond_payable import (
+    CorporateBondPayable,
+    corporate_bond_payable_prompt,
+)
+from models.property_plant_equipment import (
+    PropertyPlantEquipment,
+    property_plant_equipment_prompt,
+)
+from models.short_term_notes import (
+    ShortTermNotesPayable,
+    short_term_notes_payable_prompt,
+)
+from src.utils import call_gemini
 
 
 # Token使用記錄器
@@ -99,22 +109,34 @@ REPORTS_DIR = Path(__file__).parent.parent / "assets/reports"
 TEMPLATE_PATH = Path(__file__).parent.parent / "assets/template.xlsx"
 
 model_prompt_mapping = {
-    # "cash_equivalents": {
-    #     "prompt": cash_equivalents_prompt,
-    #     "model": CashAndEquivalents,
-    # },
+    "cash_equivalents": {
+        "prompt": cash_equivalents_prompt,
+        "model": CashAndEquivalents,
+    },
     "total_liabilities": {
         "prompt": total_liabilities_prompt,
         "model": TotalLiabilities,
     },
-    # "prepayments": {
-    #     "prompt": prepayments_prompt,
-    #     "model": PrePayments,
-    # },
-    # "receivables_related_parties": {
-    #     "prompt": receivables_related_parties_prompt,
-    #     "model": ReceivablesRelatedParties,
-    # },
+    "prepayments": {
+        "prompt": prepayments_prompt,
+        "model": PrePayments,
+    },
+    "receivables_related_parties": {
+        "prompt": receivables_related_parties_prompt,
+        "model": ReceivablesRelatedParties,
+    },
+    "corporate_bond_payable": {
+        "prompt": corporate_bond_payable_prompt,
+        "model": CorporateBondPayable,
+    },
+    "property_plant_equipment": {
+        "prompt": property_plant_equipment_prompt,
+        "model": PropertyPlantEquipment,
+    },
+    "short_term_notes_payable": {
+        "prompt": short_term_notes_payable_prompt,
+        "model": ShortTermNotesPayable,
+    },
 }
 
 
@@ -167,36 +189,6 @@ class FinancialStatementsAnalysis(BaseModel):
                 all_pages.extend(statement.page_numbers)
 
         return sorted(list(set(all_pages)))
-
-
-def call_gemini(
-    prompt: str,
-    pdf_base64: str,
-    schema: BaseModel | None = None,
-    call_type: str = "unknown",
-) -> BaseModel | str:
-    payload = {"inline_data": {"mime_type": "application/pdf", "data": pdf_base64}}
-    contents = [prompt, payload]
-    cfg = {}
-    if schema:
-        cfg = {"response_mime_type": "application/json"}
-        cfg["response_schema"] = schema
-    response = client.models.generate_content(
-        model=("gemini-2.5-flash-preview-05-20"),
-        contents=contents,
-        config=cfg,
-    )
-
-    # 記錄token使用量
-    if hasattr(response, "usage_metadata") and response.usage_metadata:
-        input_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
-        output_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
-        token_tracker.add_usage(input_tokens, output_tokens, call_type)
-        print(
-            f"🔧 {call_type}: 輸入={input_tokens:,} tokens, 輸出={output_tokens:,} tokens"
-        )
-
-    return response.parsed if schema else response.text
 
 
 # 檢查是否是掃描檔
@@ -608,7 +600,7 @@ def process_single_pdf_with_gemini(
     """
     try:
         # 記錄處理開始時的token使用量
-        start_tokens = token_tracker.get_summary()
+        # start_tokens = token_tracker.get_summary()
 
         # 分析目錄並提取財務報表位置
         toc_content = analyze_toc_and_extract_financial_statements(filepath)
@@ -688,27 +680,27 @@ def process_single_pdf_with_gemini(
                 except Exception as e:
                     print(f"✗ {model_name} 處理異常：{e}")
 
-        # verification_report_path = genetate_verification_report(
-        #     results, pdf_data, filepath
-        # )
+        verification_report_path = genetate_verification_report(
+            results, pdf_data, filepath
+        )
         verification_report_path = ""
 
         # 計算本次處理使用的token
-        end_tokens = token_tracker.get_summary()
-        process_tokens = {
-            "input_tokens": end_tokens["total_input_tokens"]
-            - start_tokens["total_input_tokens"],
-            "output_tokens": end_tokens["total_output_tokens"]
-            - start_tokens["total_output_tokens"],
-            "total_tokens": (
-                end_tokens["total_input_tokens"] + end_tokens["total_output_tokens"]
-            )
-            - (
-                start_tokens["total_input_tokens"] + start_tokens["total_output_tokens"]
-            ),
-            "api_calls": end_tokens["total_api_calls"]
-            - start_tokens["total_api_calls"],
-        }
+        # end_tokens = token_tracker.get_summary()
+        # process_tokens = {
+        #     "input_tokens": end_tokens["total_input_tokens"]
+        #     - start_tokens["total_input_tokens"],
+        #     "output_tokens": end_tokens["total_output_tokens"]
+        #     - start_tokens["total_output_tokens"],
+        #     "total_tokens": (
+        #         end_tokens["total_input_tokens"] + end_tokens["total_output_tokens"]
+        #     )
+        #     - (
+        #         start_tokens["total_input_tokens"] + start_tokens["total_output_tokens"]
+        #     ),
+        #     "api_calls": end_tokens["total_api_calls"]
+        #     - start_tokens["total_api_calls"],
+        # }
 
         return results, verification_report_path, process_tokens
 
@@ -761,11 +753,11 @@ def export_excel(results: dict[str, BaseModel], filepath: Path):
 # 如果直接執行此檔案，運行測試
 if __name__ == "__main__":
     # 重置token計數器
-    token_tracker.reset()
+    # token_tracker.reset()
 
     # 測試用的 PDF 檔案
     test_files = [
-        "fin_202503071324328842.pdf",
+        "quartely-results-2024-zh_tcm27-94407.pdf",
     ]
 
     for filename in test_files:
@@ -804,4 +796,4 @@ if __name__ == "__main__":
             print(f"✗ 檔案不存在: {filepath}")
 
     # 顯示token使用摘要
-    token_tracker.print_summary()
+    # token_tracker.print_summary()

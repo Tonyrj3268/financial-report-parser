@@ -1,7 +1,10 @@
 from pathlib import Path
-
+import os
+from google import genai
+from google.genai.types import Tool
 import pikepdf
 from pydantic import BaseModel
+from dotenv import load_dotenv
 
 # 常見的標準編碼，缺少 ToUnicode 但仍能被閱讀器正確映射
 STD_ENCODINGS = {
@@ -11,6 +14,8 @@ STD_ENCODINGS = {
     "/UniCNS-UTF16-H",
     "/UniJIS-UTF16-H",
 }
+load_dotenv()
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 def has_to_unicode(fontobj: pikepdf.Object) -> bool:
@@ -96,20 +101,29 @@ def get_spec_pages_from_markdown(res: BaseModel, pdf_path: str | Path) -> str:
     return combined_markdown
 
 
-if __name__ == "__main__":
-    from pathlib import Path
+def get_company_info(pdf_path: str | Path) -> dict:
+    pass
 
-    PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
 
-    for pdf in [
-        "quartely-results-2024-zh_tcm27-94407.pdf",
-        "fin_202503071324328842.pdf",
-        "20240314171909745560928_tc.pdf",
-        "113Q4 華碩財報(個體).pdf",
-        "TSMC 2024Q4 Unconsolidated Financial Statements_C.pdf",
-    ]:
-        bad_fonts = fonts_missing_tounicode(PDF_DIR / pdf)
-        if bad_fonts:
-            print(f"偵測到 {pdf} 缺 ToUnicode 的字型")
-        else:
-            print(f"{pdf} 所有字型皆含 ToUnicode，理論上可正常複製貼上。")
+def call_gemini(
+    prompt: str,
+    pdf_base64: str,
+    schema: BaseModel | None = None,
+    call_type: str = "unknown",
+    tools: list[Tool] | None = None,
+) -> BaseModel | str:
+    payload = {"inline_data": {"mime_type": "application/pdf", "data": pdf_base64}}
+    contents = [prompt, payload]
+    cfg = {}
+    if schema:
+        cfg = {"response_mime_type": "application/json"}
+        cfg["response_schema"] = schema
+    if tools:
+        cfg["tools"] = tools
+    response = client.models.generate_content(
+        model=("gemini-2.5-flash-preview-05-20"),
+        contents=contents,
+        config=cfg,
+    )
+
+    return response.parsed if schema else response.text
