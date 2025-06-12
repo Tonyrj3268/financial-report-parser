@@ -8,8 +8,6 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import fitz
-from dotenv import load_dotenv
-from google import genai
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 

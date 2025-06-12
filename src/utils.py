@@ -1,125 +1,70 @@
 from pathlib import Path
 import os
 from google import genai
-from google.genai.types import Tool
-import pikepdf
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from models.company_info import PdfInfo, pdf_info_prompt
+import fitz
+import base64
 
-# 常見的標準編碼，缺少 ToUnicode 但仍能被閱讀器正確映射
-STD_ENCODINGS = {
-    "/WinAnsiEncoding",
-    "/MacRomanEncoding",
-    "/UniGB-UTF16-H",
-    "/UniCNS-UTF16-H",
-    "/UniJIS-UTF16-H",
-}
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
-def has_to_unicode(fontobj: pikepdf.Object) -> bool:
+def get_company_info(pdf_path: str | Path) -> BaseModel:
     """
-    檢查單一 Font Dictionary（或其子字型）是否含有效的 ToUnicode
-    或使用標準編碼。
+    取得公司資訊
     """
-    # 1. 外層若有 ToUnicode
-    if "/ToUnicode" in fontobj:
-        return True
+    with fitz.open(pdf_path) as doc:
+        with fitz.open() as pdf_writer:
+            pdf_writer.insert_pdf(doc, from_page=0, to_page=0)
+            pdf_bytes = pdf_writer.tobytes()
+            base64_content = base64.b64encode(pdf_bytes).decode("utf-8")
 
-    # 2. 若使用的是標準 Encoding，也當作可複製
-    encoding = fontobj.get("/Encoding")
-    if encoding in STD_ENCODINGS:
-        return True
-
-    # 3. 檢查複合字型的子字型（DescendantFonts）
-    descendants = fontobj.get("/DescendantFonts")
-    if descendants:
-        for subref in descendants:
-            subfont = subref
-            if has_to_unicode(subfont):
-                return True
-
-    return False
-
-
-def fonts_missing_tounicode(pdf_path: str | Path) -> bool:
+    pdf_info: PdfInfo = call_gemini(pdf_info_prompt, base64_content, schema=PdfInfo)
+    export_ratio_prompt = f"""
+    請上網告訴我 {pdf_info.pdf_year} {pdf_info.company_name} 的外銷出口比率相關資訊，外銷出口比率的定義為 外國的營業收入 / (外國的營業收入 + 台灣的營業收入)
     """
-    傳回 True or False，表示 PDF 中是否有字型缺少 ToUnicode。
-    這個函式會檢查 PDF 中的每一頁，並檢查每一頁的字型資源。
+    export_ratio = gemini_web_search(export_ratio_prompt)
+    print(export_ratio)
+    full_prompt = f"""
+    以下資訊是 {pdf_info.pdf_year} 年報的 {pdf_info.company_name} 的外銷出口比率相關資料，外銷出口比率的定義為 外國的營業收入 / (外國的營業收入 + 台灣的營業收入)，請幫我整理一下:
+    {export_ratio}
     """
-    with pikepdf.open(pdf_path) as pdf:
-        for _, page in enumerate(pdf.pages, start=1):
-            fonts = page.Resources.get("/Font", {})
-            for _, font_ref in fonts.items():
-                font = font_ref
-                if not has_to_unicode(font):
-                    return True
-    return False
+    pdf_info: PdfInfo = call_gemini(full_prompt, schema=PdfInfo)
+    return pdf_info
 
 
-MD_DIR = Path(__file__).parent.parent / "assets/markdowns"
-
-
-def get_markdown_path(pdf_path):
-    return MD_DIR / (pdf_path.stem + ".md")
-
-
-def get_spec_pages_from_markdown(res: BaseModel, pdf_path: str | Path) -> str:
-    # 提取所有相關頁數
-    all_pages = set()
-    for attr_name in res.__dict__:
-        if attr_name.endswith("_related_pages"):
-            page_list = getattr(res, attr_name)
-            if page_list:  # 確保頁數列表不為空
-                all_pages.update(page_list)
-
-    # 按數字順序排列頁數
-    sorted_pages = sorted(list(all_pages), key=int)
-    # 從原始 markdown 中提取對應頁數的內容
-    markdown_path = get_markdown_path(pdf_path)
-    with open(markdown_path, "r", encoding="utf-8") as f:
-        full_markdown = f.read()
-
-    # 分割 markdown 成頁
-    parts = full_markdown.split("START OF PAGE:")
-    pages = ["START OF PAGE:" + p for p in parts if p]
-
-    # 提取指定頁數的內容
-    extracted_pages = []
-    for page_num in sorted_pages:
-        for page_content in pages:
-            if page_content.startswith(f"START OF PAGE: {page_num}"):
-                extracted_pages.append(page_content)
-                break
-
-    # 處理第一頁的特殊情況（如果沒有前綴）
-    if pages and not pages[0].startswith("START OF PAGE: ") and "1" in sorted_pages:
-        extracted_pages.insert(0, pages[0])
-    # 生成新的 markdown 文件
-    combined_markdown = "\n======\n".join(extracted_pages)
-    return combined_markdown
-
-
-def get_company_info(pdf_path: str | Path) -> dict:
-    pass
+def gemini_web_search(query: str) -> str:
+    model_id = "gemini-2.5-flash-preview-05-20"
+    google_search_tool = Tool(google_search=GoogleSearch())
+    response = client.models.generate_content(
+        model=model_id,
+        contents=query,
+        config=GenerateContentConfig(
+            tools=[google_search_tool],
+            response_modalities=["TEXT"],
+        ),
+    )
+    return response.text
 
 
 def call_gemini(
     prompt: str,
-    pdf_base64: str,
+    pdf_base64: str | None = None,
     schema: BaseModel | None = None,
     call_type: str = "unknown",
-    tools: list[Tool] | None = None,
 ) -> BaseModel | str:
-    payload = {"inline_data": {"mime_type": "application/pdf", "data": pdf_base64}}
-    contents = [prompt, payload]
+    if pdf_base64:
+        payload = {"inline_data": {"mime_type": "application/pdf", "data": pdf_base64}}
+        contents = [prompt, payload]
+    else:
+        contents = [prompt]
     cfg = {}
     if schema:
         cfg = {"response_mime_type": "application/json"}
         cfg["response_schema"] = schema
-    if tools:
-        cfg["tools"] = tools
     response = client.models.generate_content(
         model=("gemini-2.5-flash-preview-05-20"),
         contents=contents,
@@ -127,3 +72,11 @@ def call_gemini(
     )
 
     return response.parsed if schema else response.text
+
+
+if __name__ == "__main__":
+    pdf_path = Path(
+        r"C:\Users\TonyLin\Desktop\work-dir\financial-report-parser\assets\pdfs\TSMC 2023Q4 Unconsolidated Financial Statements_C_converted.pdf"
+    )
+    pdf_info = get_company_info(pdf_path)
+    print(pdf_info)
