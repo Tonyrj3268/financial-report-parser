@@ -30,75 +30,10 @@ from models.short_term_notes import (
     ShortTermNotesPayable,
     short_term_notes_payable_prompt,
 )
-from src.utils import call_gemini
+from utils import get_company_info
+from gemini_client import get_gemini
 
-
-# Token使用記錄器
-class TokenUsageTracker:
-    """Token使用記錄器"""
-
-    def __init__(self):
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
-        self.api_calls = 0
-        self.call_details = []
-        self._lock = threading.Lock()
-
-    def add_usage(
-        self, input_tokens: int, output_tokens: int, call_type: str = "unknown"
-    ):
-        """添加token使用記錄"""
-        with self._lock:
-            self.total_input_tokens += input_tokens
-            self.total_output_tokens += output_tokens
-            self.api_calls += 1
-            self.call_details.append(
-                {
-                    "call_type": call_type,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "total_tokens": input_tokens + output_tokens,
-                }
-            )
-
-    def get_summary(self) -> dict:
-        """獲取使用摘要"""
-        total_tokens = self.total_input_tokens + self.total_output_tokens
-        return {
-            "total_api_calls": self.api_calls,
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-            "total_tokens": total_tokens,
-            "call_details": self.call_details,
-        }
-
-    def reset(self):
-        """重置計數器"""
-        with self._lock:
-            self.total_input_tokens = 0
-            self.total_output_tokens = 0
-            self.api_calls = 0
-            self.call_details = []
-
-    def print_summary(self):
-        """列印使用摘要"""
-        summary = self.get_summary()
-        print(f"\n📊 Token使用摘要：")
-        print(f"API呼叫次數：{summary['total_api_calls']}")
-        print(f"輸入Token：{summary['total_input_tokens']:,}")
-        print(f"輸出Token：{summary['total_output_tokens']:,}")
-        print(f"總計Token：{summary['total_tokens']:,}")
-
-        if summary["call_details"]:
-            print(f"\n詳細呼叫記錄：")
-            for i, detail in enumerate(summary["call_details"], 1):
-                print(
-                    f"  {i}. {detail['call_type']}: 輸入={detail['input_tokens']:,}, 輸出={detail['output_tokens']:,}, 總計={detail['total_tokens']:,}"
-                )
-
-
-# 全局token追蹤器
-token_tracker = TokenUsageTracker()
+client = get_gemini()
 
 # 添加 PDF_DIR 和 model_prompt_mapping 以便 GUI 使用
 PDF_DIR = Path(__file__).parent.parent / "assets/pdfs"
@@ -111,30 +46,30 @@ model_prompt_mapping = {
         "prompt": cash_equivalents_prompt,
         "model": CashAndEquivalents,
     },
-    "total_liabilities": {
-        "prompt": total_liabilities_prompt,
-        "model": TotalLiabilities,
-    },
-    "prepayments": {
-        "prompt": prepayments_prompt,
-        "model": PrePayments,
-    },
-    "receivables_related_parties": {
-        "prompt": receivables_related_parties_prompt,
-        "model": ReceivablesRelatedParties,
-    },
-    "corporate_bond_payable": {
-        "prompt": corporate_bond_payable_prompt,
-        "model": CorporateBondPayable,
-    },
-    "property_plant_equipment": {
-        "prompt": property_plant_equipment_prompt,
-        "model": PropertyPlantEquipment,
-    },
-    "short_term_notes_payable": {
-        "prompt": short_term_notes_payable_prompt,
-        "model": ShortTermNotesPayable,
-    },
+    # "total_liabilities": {
+    #     "prompt": total_liabilities_prompt,
+    #     "model": TotalLiabilities,
+    # },
+    # "prepayments": {
+    #     "prompt": prepayments_prompt,
+    #     "model": PrePayments,
+    # },
+    # "receivables_related_parties": {
+    #     "prompt": receivables_related_parties_prompt,
+    #     "model": ReceivablesRelatedParties,
+    # },
+    # "corporate_bond_payable": {
+    #     "prompt": corporate_bond_payable_prompt,
+    #     "model": CorporateBondPayable,
+    # },
+    # "property_plant_equipment": {
+    #     "prompt": property_plant_equipment_prompt,
+    #     "model": PropertyPlantEquipment,
+    # },
+    # "short_term_notes_payable": {
+    #     "prompt": short_term_notes_payable_prompt,
+    #     "model": ShortTermNotesPayable,
+    # },
 }
 
 
@@ -150,6 +85,8 @@ class FinancialStatementLocation(BaseModel):
 class FinancialStatementsAnalysis(BaseModel):
     """財務報表分析結果"""
 
+    company_name: str = Field(description="公司名稱")
+    pdf_year: int = Field(description="年份")
     individual_balance_sheet: FinancialStatementLocation = Field(
         description="個體資產負債表"
     )
@@ -272,7 +209,7 @@ def analyze_toc_and_extract_financial_statements(
 
         # 準備分析目錄的提示詞
         prompt = """
-        請分析目錄頁，找出以下財務報表項目在目錄中顯示的頁數：
+        請分析目錄頁，找出以下財務報表項目在目錄中顯示的頁數，並回傳公司名稱和年份：
 
         1. 個體資產負債表
         2. 個體綜合損益表  
@@ -292,13 +229,12 @@ def analyze_toc_and_extract_financial_statements(
         - 如果找不到某個項目，請將found設為false
         - 如果某個報表跨越多頁，請列出所有相關頁數
         - 重要會計項目明細表不等於重要會計項目之說明，請注意區分
+        - 請回傳公司名稱和年份
         """
 
         print("正在分析目錄頁內容...")
 
-        result = call_gemini(
-            prompt, base64_content, FinancialStatementsAnalysis, "目錄分析"
-        )
+        result = client.call(prompt, FinancialStatementsAnalysis, base64_content)
         print("目錄分析完成！")
 
         return result
@@ -367,9 +303,7 @@ def convert_pdf_to_markdown(
 
                 print(f"正在呼叫Gemini API轉換第 {page} 頁...")
 
-                result = call_gemini(
-                    prompt, base64_content, None, f"PDF轉Markdown_第{page}頁"
-                )
+                result = client.call(prompt, None, base64_content)
 
                 print(f"第 {page} 頁轉換完成")
                 return page, result
@@ -545,10 +479,9 @@ def genetate_verification_report(
     3. **數據一致性檢查**：確認各財務報表項目之間的邏輯一致性
 
     ## 分析重點：
-    - 現金及約當現金項目的完整性和準確性
-    - 預付款項的分類和金額正確性  
-    - 關係人應收款項的詳細分析
-    - 負債總額的計算和分類正確性
+    - 項目的完整性和準確性
+    - 分類和金額正確性  
+    - reason 詳細分析
 
     ## 參考標準：
     - 確保數字精確到小數點
@@ -568,7 +501,7 @@ def genetate_verification_report(
     """
 
     # 保存驗證結果
-    result = call_gemini(prompt, pdf_data, None, "驗證報告生成")
+    result = client.call(prompt, None, pdf_data)
 
     # 確保報告目錄存在
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -585,7 +518,7 @@ def genetate_verification_report(
 
 def process_single_pdf_with_gemini(
     filepath: Path, model_selection: list[str]
-) -> tuple[dict, str, dict]:
+) -> tuple[dict, str]:
     """
     使用 Gemini 處理單個 PDF 檔案的財務報表分析
 
@@ -594,18 +527,14 @@ def process_single_pdf_with_gemini(
         model_selection: 選擇的模型列表
 
     回傳:
-        tuple[dict, str, dict]: 包含所有模型分析結果的字典、驗證報告的路徑和token使用資訊
+        tuple[dict, str]: 包含所有模型分析結果的字典、驗證報告的路徑
     """
     try:
-        # 記錄處理開始時的token使用量
-        # start_tokens = token_tracker.get_summary()
-
         # 分析目錄並提取財務報表位置
         toc_content = analyze_toc_and_extract_financial_statements(filepath)
 
         # 正確地提取所有財務報表的頁碼
         table_pages = toc_content.get_all_page_numbers()
-
         # 檢查是否為掃描文件
         scan_results = check_scanned_pages(filepath, table_pages) if table_pages else {}
         scanned_pages = [page for page, is_scan in scan_results.items() if is_scan]
@@ -623,15 +552,14 @@ def process_single_pdf_with_gemini(
 
         # 讀取PDF並轉換為base64
         pdf_data = base64.b64encode(filepath.read_bytes()).decode("utf-8")
+        pdf_info = get_company_info(toc_content.company_name, toc_content.pdf_year)
 
         def process_model(prompt_model_pair) -> tuple[str, BaseModel | None]:
             """處理單個模型的分析"""
             model, prompt = prompt_model_pair
             prompt = prompt + f"\n\n資料請優先以大表為主，附註為輔"
             try:
-                result: BaseModel = call_gemini(
-                    prompt, pdf_data, model, f"財務分析_{model.__name__}"
-                )
+                result: BaseModel = client.call(prompt, model, pdf_data)
                 # 直接返回模型對象而不是字典
                 return model.__name__, result
             except Exception as e:
@@ -639,24 +567,17 @@ def process_single_pdf_with_gemini(
                 return model.__name__, None
 
         # model_prompt_mapping
-        if model_selection:
-            model_pairs = [
-                (
-                    model_prompt_mapping[model_name]["model"],
-                    model_prompt_mapping[model_name]["prompt"],
-                )
-                for model_name in model_prompt_mapping.keys()
-                if model_name in model_selection
-            ]
-        else:
-            model_pairs = [
-                (
-                    model_prompt_mapping[model_name]["model"],
-                    model_prompt_mapping[model_name]["prompt"],
-                )
-                for model_name in model_prompt_mapping.keys()
-            ]
+        model_pairs = [
+            (
+                model_prompt_mapping[model_name]["model"],
+                model_prompt_mapping[model_name]["prompt"],
+            )
+            for model_name in model_prompt_mapping.keys()
+            if not model_selection or model_name in model_selection
+        ]
+
         results: dict[str, BaseModel] = {}
+        results["pdf_info"] = pdf_info
         # 使用ThreadPoolExecutor進行並行處理
         with ThreadPoolExecutor(max_workers=4) as executor:
             # 提交所有任務
@@ -681,30 +602,12 @@ def process_single_pdf_with_gemini(
         verification_report_path = genetate_verification_report(
             results, pdf_data, filepath
         )
-        verification_report_path = ""
 
-        # 計算本次處理使用的token
-        # end_tokens = token_tracker.get_summary()
-        # process_tokens = {
-        #     "input_tokens": end_tokens["total_input_tokens"]
-        #     - start_tokens["total_input_tokens"],
-        #     "output_tokens": end_tokens["total_output_tokens"]
-        #     - start_tokens["total_output_tokens"],
-        #     "total_tokens": (
-        #         end_tokens["total_input_tokens"] + end_tokens["total_output_tokens"]
-        #     )
-        #     - (
-        #         start_tokens["total_input_tokens"] + start_tokens["total_output_tokens"]
-        #     ),
-        #     "api_calls": end_tokens["total_api_calls"]
-        #     - start_tokens["total_api_calls"],
-        # }
-
-        return results, verification_report_path, process_tokens
+        return results, verification_report_path
 
     except Exception as e:
         print(f"處理 PDF 檔案時發生錯誤：{e}")
-        return {}, "", {}
+        return {}, ""
 
 
 def export_excel(results: dict[str, BaseModel], filepath: Path):
@@ -755,17 +658,16 @@ if __name__ == "__main__":
 
     # 測試用的 PDF 檔案
     test_files = [
-        "quartely-results-2024-zh_tcm27-94407.pdf",
+        # "quartely-results-2024-zh_tcm27-94407.pdf",
+        "fin_202503071324328842.pdf"
     ]
 
     for filename in test_files:
         filepath = PDF_DIR / filename
         if filepath.exists():
             print(f"測試處理檔案: {filename}")
-            results, verification_report_path, process_tokens = (
-                process_single_pdf_with_gemini(
-                    filepath, model_selection=model_prompt_mapping.keys()
-                )
+            results, verification_report_path = process_single_pdf_with_gemini(
+                filepath, model_selection=model_prompt_mapping.keys()
             )
             export_excel(results, "")
             # 確保結果目錄存在
@@ -783,15 +685,3 @@ if __name__ == "__main__":
                 json.dump(json_results, f, indent=4, ensure_ascii=False)
 
             print(f"✓ 結果已保存到: {results_path}")
-
-            # 顯示本次檔案處理的token使用情況
-            print(f"📊 本次處理 '{filename}' 的Token使用：")
-            print(f"   API呼叫：{process_tokens.get('api_calls', 0)} 次")
-            print(f"   輸入Token：{process_tokens.get('input_tokens', 0):,}")
-            print(f"   輸出Token：{process_tokens.get('output_tokens', 0):,}")
-            print(f"   總計Token：{process_tokens.get('total_tokens', 0):,}")
-        else:
-            print(f"✗ 檔案不存在: {filepath}")
-
-    # 顯示token使用摘要
-    # token_tracker.print_summary()

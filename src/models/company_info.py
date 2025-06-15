@@ -11,7 +11,8 @@ class PdfInfo(BaseModel):
     export_ratio: Optional[float] = Field(None, description="外銷比重")
 
     def fill_excel(self, wb: Workbook):
-        pass
+        ws_liabilities = wb["負債表 "]
+        ws_liabilities["C43"] = self.export_ratio
 
 
 pdf_info_prompt = """
