@@ -6,6 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
+import time
 
 import fitz
 from openpyxl import load_workbook
@@ -30,7 +31,7 @@ from models.short_term_notes import (
     ShortTermNotesPayable,
     short_term_notes_payable_prompt,
 )
-from utils import get_company_info
+from utils import get_company_info_with_pdf
 from gemini_client import get_gemini
 
 client = get_gemini()
@@ -46,30 +47,30 @@ model_prompt_mapping = {
         "prompt": cash_equivalents_prompt,
         "model": CashAndEquivalents,
     },
-    # "total_liabilities": {
-    #     "prompt": total_liabilities_prompt,
-    #     "model": TotalLiabilities,
-    # },
-    # "prepayments": {
-    #     "prompt": prepayments_prompt,
-    #     "model": PrePayments,
-    # },
-    # "receivables_related_parties": {
-    #     "prompt": receivables_related_parties_prompt,
-    #     "model": ReceivablesRelatedParties,
-    # },
-    # "corporate_bond_payable": {
-    #     "prompt": corporate_bond_payable_prompt,
-    #     "model": CorporateBondPayable,
-    # },
-    # "property_plant_equipment": {
-    #     "prompt": property_plant_equipment_prompt,
-    #     "model": PropertyPlantEquipment,
-    # },
-    # "short_term_notes_payable": {
-    #     "prompt": short_term_notes_payable_prompt,
-    #     "model": ShortTermNotesPayable,
-    # },
+    "total_liabilities": {
+        "prompt": total_liabilities_prompt,
+        "model": TotalLiabilities,
+    },
+    "prepayments": {
+        "prompt": prepayments_prompt,
+        "model": PrePayments,
+    },
+    "receivables_related_parties": {
+        "prompt": receivables_related_parties_prompt,
+        "model": ReceivablesRelatedParties,
+    },
+    "corporate_bond_payable": {
+        "prompt": corporate_bond_payable_prompt,
+        "model": CorporateBondPayable,
+    },
+    "property_plant_equipment": {
+        "prompt": property_plant_equipment_prompt,
+        "model": PropertyPlantEquipment,
+    },
+    "short_term_notes_payable": {
+        "prompt": short_term_notes_payable_prompt,
+        "model": ShortTermNotesPayable,
+    },
 }
 
 
@@ -517,7 +518,7 @@ def genetate_verification_report(
 
 
 def process_single_pdf_with_gemini(
-    filepath: Path, model_selection: list[str]
+    filepath: Path, model_selection: list[str], retry: bool = False
 ) -> tuple[dict, str]:
     """
     使用 Gemini 處理單個 PDF 檔案的財務報表分析
@@ -525,6 +526,7 @@ def process_single_pdf_with_gemini(
     參數:
         filepath: PDF 檔案路徑
         model_selection: 選擇的模型列表
+        retry: 是否為重試（內部用）
 
     回傳:
         tuple[dict, str]: 包含所有模型分析結果的字典、驗證報告的路徑
@@ -552,7 +554,9 @@ def process_single_pdf_with_gemini(
 
         # 讀取PDF並轉換為base64
         pdf_data = base64.b64encode(filepath.read_bytes()).decode("utf-8")
-        pdf_info = get_company_info(toc_content.company_name, toc_content.pdf_year)
+        pdf_info = get_company_info_with_pdf(
+            toc_content.company_name, toc_content.pdf_year
+        )
 
         def process_model(prompt_model_pair) -> tuple[str, BaseModel | None]:
             """處理單個模型的分析"""
@@ -587,6 +591,8 @@ def process_single_pdf_with_gemini(
             }
 
             # 收集結果
+            fail_count = 0
+            total_count = len(model_pairs)
             for future in as_completed(future_to_model):
                 model_name = future_to_model[future]
                 try:
@@ -596,9 +602,27 @@ def process_single_pdf_with_gemini(
                         print(f"✓ {model_name} 處理完成")
                     else:
                         print(f"✗ {model_name} 處理失敗")
+                        fail_count += 1
                 except Exception as e:
                     print(f"✗ {model_name} 處理異常：{e}")
+                    fail_count += 1
 
+            # 新增：如果失敗比例超過門檻就中止，並可自動重試一次
+            if total_count > 0 and fail_count / total_count > 0.3:
+                print(
+                    f"✗ 超過允許失敗比例（{fail_count}/{total_count}），中止後續任務！"
+                )
+                if not retry:
+                    print("將於 60 秒後自動重試一次...")
+                    time.sleep(60)
+                    return process_single_pdf_with_gemini(
+                        filepath, model_selection, retry=True
+                    )
+                else:
+                    print("已重試過一次，仍失敗，放棄處理。")
+                    return {}, ""
+
+        verification_report_path = ""
         verification_report_path = genetate_verification_report(
             results, pdf_data, filepath
         )
@@ -659,7 +683,9 @@ if __name__ == "__main__":
     # 測試用的 PDF 檔案
     test_files = [
         # "quartely-results-2024-zh_tcm27-94407.pdf",
-        "fin_202503071324328842.pdf"
+        # "fin_202503071324328842.pdf"
+        # "TSMC 2024Q4 Unconsolidated Financial Statements_C_converted.pdf",
+        "TSMC 2022Q4 Unconsolidated Financial Statements_C.pdf"
     ]
 
     for filename in test_files:
@@ -667,7 +693,9 @@ if __name__ == "__main__":
         if filepath.exists():
             print(f"測試處理檔案: {filename}")
             results, verification_report_path = process_single_pdf_with_gemini(
-                filepath, model_selection=model_prompt_mapping.keys()
+                filepath,
+                model_selection=model_prompt_mapping.keys(),
+                retry=True,
             )
             export_excel(results, "")
             # 確保結果目錄存在

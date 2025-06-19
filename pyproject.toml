@@ -30,4 +30,5 @@ dependencies = [
     "pdfkit>=1.0.0",
     "wkhtmltopdf>=0.2",
     "spire-doc>=13.4.6",
+    "bs4>=0.0.2",
 ]

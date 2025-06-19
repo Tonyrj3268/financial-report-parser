@@ -32,12 +32,13 @@ class ShortTermNotesPayable(BaseModel):
     unit_is_thousand: bool = Field(None, description="單位是否為千元")
 
     def fill_excel(self, wb: Workbook):
-        ws_liabilities = wb["負債表"]
+        ws_liabilities = wb["負債表 "]
 
         # 國內短期票券淨額
         domestic_notes_amount = convert_to_thousand(
             sum([note.amount.value for note in self.domestic_notes])
-            - self.domestic_notes_discount.value
+            - self.domestic_notes_discount.value,
+            self.unit_is_thousand,
         )
 
         ws_liabilities["C22"] = (
@@ -47,7 +48,8 @@ class ShortTermNotesPayable(BaseModel):
         # 國外短期票券淨額
         overseas_notes_amount = convert_to_thousand(
             sum([note.amount.value for note in self.overseas_notes])
-            - self.overseas_notes_discount.value
+            - self.overseas_notes_discount.value,
+            self.unit_is_thousand,
         )
         ws_liabilities["C24"] = (
             overseas_notes_amount if overseas_notes_amount > 0 else None
