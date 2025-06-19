@@ -151,6 +151,7 @@ def get_company_info_with_pdf(company_name: str, pdf_year: int) -> PdfInfo:
                 export_ratio = export_ratio * 100
         except ValueError:
             export_ratio = 0
+            print("未找到外銷出口比率，請手動確認")
 
         # 建立 PdfInfo 物件
         pdf_info = PdfInfo(
